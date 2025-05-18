@@ -1,0 +1,42 @@
+# Dependencies
+/node_modules
+/.pnpm-store
+
+# Testing
+/coverage
+
+# Next.js
+/.next/
+/out/
+
+# Production
+/build
+
+# Misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local Environment Variables
+.env*.local
+.env
+
+# Editor directories and files
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Wrangler / Cloudflare Workers
+.wrangler/
+
+# Drizzle studio
+drizzle/meta/_journal
+drizzle/migrations_meta/_journal
