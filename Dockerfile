@@ -16,6 +16,9 @@ RUN pnpm install --frozen-lockfile
 # Copy the rest of the application code
 COPY . .
 
+# Создаем директорию public, если она отсутствует
+RUN mkdir -p /app/public
+
 # Build the Next.js application
 RUN pnpm build
 
@@ -33,6 +36,9 @@ COPY --from=builder /app/package.json /app/pnpm-lock.yaml ./
 
 # Install only production dependencies
 RUN pnpm install --prod --frozen-lockfile
+
+# Создаем директорию public в runner stage для дополнительной надежности
+RUN mkdir -p /app/public
 
 # Copy the built Next.js application from the builder stage
 COPY --from=builder /app/.next ./.next
