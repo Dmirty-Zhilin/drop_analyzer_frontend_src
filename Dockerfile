@@ -7,13 +7,16 @@ RUN apk add --no-cache libc6-compat
 
 # Copy package.json and install dependencies
 COPY package.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps --force
 
 # Copy the rest of the application
 COPY . .
 
-# Build the application
-RUN npm run build
+# Debug - show installed packages
+RUN npm list react next
+
+# Build the application with verbose output
+RUN npm run build --verbose
 
 # Set environment variables
 ENV NODE_ENV production
