@@ -1,9 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, FormEvent } from 'react';
-import { ReportTable } from '@/components/reports/ReportTable';
+import { StructuredReportTable } from '@/components/reports/StructuredReportTable';
+import { ApiSettings } from '@/components/settings/ApiSettings';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/components/ui/use-toast";
 
-// Define types for API responses (can be moved to a types.ts file)
+// Define types for API responses
 interface DomainInput {
   domain_name: string;
 }
@@ -33,6 +36,11 @@ interface AnalysisFullReportResponse extends AnalysisTaskResponse {
   results?: DomainAnalysisResult[];
 }
 
+interface ApiSettings {
+  openRouterApiKey: string;
+  enableThematicAnalysis: boolean;
+}
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1/analysis';
 
 export default function HomePage() {
@@ -42,6 +50,31 @@ export default function HomePage() {
   const [taskReport, setTaskReport] = useState<AnalysisFullReportResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sseSource, setSseSource] = useState<EventSource | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("analysis");
+  const [apiSettings, setApiSettings] = useState<ApiSettings>({
+    openRouterApiKey: '',
+    enableThematicAnalysis: false
+  });
+
+  // Загрузка настроек API при инициализации
+  useEffect(() => {
+    const loadApiSettings = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/settings`);
+        if (response.ok) {
+          const data = await response.json();
+          setApiSettings({
+            openRouterApiKey: data.openRouterApiKey || '',
+            enableThematicAnalysis: data.enableThematicAnalysis || false
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load API settings:', error);
+      }
+    };
+    
+    loadApiSettings();
+  }, []);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -90,7 +123,7 @@ export default function HomePage() {
     }
   };
 
- const fetchTaskReport = async (taskId: string) => {
+  const fetchTaskReport = async (taskId: string) => {
     if (!taskId) return;
     // setIsLoading(true); // isLoading should already be true or managed by SSE
     try {
@@ -223,99 +256,159 @@ export default function HomePage() {
         body: JSON.stringify({
           task_id: taskReport.task_id,
           report_name: `Report for task ${taskReport.task_id}`,
+          report_type: 'general'
         }),
       });
       
       if (!response.ok) {
-        throw new Error('Failed to save report');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to save report');
       }
       
       const data = await response.json();
-      alert('Отчет успешно сохранен!');
-    } catch (err) {
+      toast({
+        title: "Успех",
+        description: "Отчет успешно сохранен",
+        variant: "default",
+      });
+    } catch (err: any) {
       console.error('Error saving report:', err);
-      setError('Failed to save report. Please try again.');
+      setError(err.message || 'Failed to save report. Please try again.');
+      toast({
+        title: "Ошибка",
+        description: "Не удалось сохранить отчет. Пожалуйста, попробуйте снова.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  // Функция для сохранения настроек API
+  const handleSaveApiSettings = async (settings: ApiSettings) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/settings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save API settings');
+      }
+      
+      setApiSettings(settings);
+      return Promise.resolve();
+    } catch (error) {
+      console.error('Error saving API settings:', error);
+      return Promise.reject(error);
     }
   };
 
   return (
     <div className="space-y-8">
-      <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
-        <h1 className="text-3xl font-bold mb-6 text-center text-white">Analyze Drop Domains</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="domains" className="block text-sm font-medium text-gray-300 mb-1">
-              Enter Domain Names (one per line):
-            </label>
-            <textarea
-              id="domains"
-              name="domains"
-              rows={10}
-              className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-gray-100 placeholder-gray-400"
-              placeholder="example.com\nexpired-domain.org\nanother-one.net"
-              value={domainsInput}
-              onChange={(e) => setDomainsInput(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-md shadow-md disabled:opacity-50 transition duration-150 ease-in-out"
-          >
-            {isLoading ? 'Processing...' : 'Start Analysis'}
-          </button>
-        </form>
-        {error && <p className="mt-4 text-red-400 text-center">Error: {error}</p>}
-      </section>
-
-      {currentTask && (
-        <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
-          <h2 className="text-2xl font-semibold mb-4 text-white">Task Status</h2>
-          <p className="text-gray-300">Task ID: <span className="font-mono text-indigo-400">{currentTask.task_id}</span></p>
-          <p className="text-gray-300">Status: <span className={`font-semibold ${currentTask.status === 'completed' ? 'text-green-400' : currentTask.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}`}>{currentTask.status}</span></p>
-          {currentTask.message && <p className="text-gray-400 italic">{currentTask.message}</p>}
-          {isLoading && currentTask.status !== 'completed' && currentTask.status !== 'failed' && (
-            <div className="mt-4">
-              <div className="animate-pulse flex space-x-4">
-                <div className="rounded-full bg-slate-700 h-10 w-10"></div>
-                <div className="flex-1 space-y-6 py-1">
-                  <div className="h-2 bg-slate-700 rounded"></div>
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="h-2 bg-slate-700 rounded col-span-2"></div>
-                      <div className="h-2 bg-slate-700 rounded col-span-1"></div>
-                    </div>
-                    <div className="h-2 bg-slate-700 rounded"></div>
-                  </div>
-                </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="analysis">Анализ доменов</TabsTrigger>
+          <TabsTrigger value="settings">Настройки</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="analysis">
+          <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
+            <h1 className="text-3xl font-bold mb-6 text-center text-white">Analyze Drop Domains</h1>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="domains" className="block text-sm font-medium text-gray-300 mb-1">
+                  Enter Domain Names (one per line):
+                </label>
+                <textarea
+                  id="domains"
+                  name="domains"
+                  rows={10}
+                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-gray-100 placeholder-gray-400"
+                  placeholder="example.com\nexpired-domain.org\nanother-one.net"
+                  value={domainsInput}
+                  onChange={(e) => setDomainsInput(e.target.value)}
+                  disabled={isLoading}
+                />
               </div>
-              <p className="text-center text-yellow-400 mt-2">{currentTask.message || "Processing... please wait."}</p>
-            </div>
-          )}
-        </section>
-      )}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-md shadow-md disabled:opacity-50 transition duration-150 ease-in-out"
+              >
+                {isLoading ? 'Processing...' : 'Start Analysis'}
+              </button>
+            </form>
+            {error && <p className="mt-4 text-red-400 text-center">Error: {error}</p>}
+          </section>
 
-      {taskReport && taskReport.results && (
-        <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-semibold text-white">Analysis Report (Task ID: {taskReport.task_id})</h2>
-            <button
-              onClick={handleSaveReport}
-              disabled={isLoading}
-              className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md shadow-sm disabled:opacity-50 transition duration-150 ease-in-out"
-            >
-              Save Report
-            </button>
-          </div>
-          
-          <div className="bg-gray-700 p-4 rounded-md shadow">
-            <ReportTable data={taskReport.results} />
-          </div>
-        </section>
-      )}
+          {currentTask && (
+            <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
+              <h2 className="text-2xl font-semibold mb-4 text-white">Task Status</h2>
+              <p className="text-gray-300">Task ID: <span className="font-mono text-indigo-400">{currentTask.task_id}</span></p>
+              <p className="text-gray-300">Status: <span className={`font-semibold ${currentTask.status === 'completed' ? 'text-green-400' : currentTask.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}`}>{currentTask.status}</span></p>
+              {currentTask.message && <p className="text-gray-400 italic">{currentTask.message}</p>}
+              {isLoading && currentTask.status !== 'completed' && currentTask.status !== 'failed' && (
+                <div className="mt-4">
+                  <div className="animate-pulse flex space-x-4">
+                    <div className="rounded-full bg-slate-700 h-10 w-10"></div>
+                    <div className="flex-1 space-y-6 py-1">
+                      <div className="h-2 bg-slate-700 rounded"></div>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="h-2 bg-slate-700 rounded col-span-2"></div>
+                          <div className="h-2 bg-slate-700 rounded col-span-1"></div>
+                        </div>
+                        <div className="h-2 bg-slate-700 rounded"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-center text-yellow-400 mt-2">{currentTask.message || "Processing... please wait."}</p>
+                </div>
+              )}
+            </section>
+          )}
+
+          {taskReport && taskReport.results && (
+            <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-semibold text-white">Analysis Report (Task ID: {taskReport.task_id})</h2>
+                <button
+                  onClick={handleSaveReport}
+                  disabled={isLoading}
+                  className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md shadow-sm disabled:opacity-50 transition duration-150 ease-in-out"
+                >
+                  Save Report
+                </button>
+              </div>
+              
+              <div className="bg-gray-700 p-4 rounded-md shadow">
+                <StructuredReportTable 
+                  data={taskReport.results.map(result => ({
+                    domain: result.domain_name,
+                    wayback_history_summary: result.wayback_history_summary,
+                    seo_metrics: result.seo_metrics,
+                    thematic_analysis_result: result.thematic_analysis_result,
+                    assessment_score: result.assessment_score,
+                    assessment_summary: result.assessment_summary
+                  }))} 
+                  onSaveReport={handleSaveReport}
+                />
+              </div>
+            </section>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="settings">
+          <ApiSettings 
+            initialSettings={apiSettings}
+            onSave={handleSaveApiSettings}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
