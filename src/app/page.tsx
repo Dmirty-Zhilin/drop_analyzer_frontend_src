@@ -4,7 +4,6 @@ import React, { useState, useEffect, FormEvent } from 'react';
 import { StructuredReportTable } from '@/components/reports/StructuredReportTable';
 import { ApiSettings } from '@/components/settings/ApiSettings';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "@/components/ui/use-toast";
 
 // Define types for API responses
 interface DomainInput {
@@ -55,6 +54,7 @@ export default function HomePage() {
     openRouterApiKey: '',
     enableThematicAnalysis: false
   });
+  const [saveStatus, setSaveStatus] = useState<{message: string, type: 'success' | 'error'} | null>(null);
 
   // Загрузка настроек API при инициализации
   useEffect(() => {
@@ -248,6 +248,8 @@ export default function HomePage() {
     
     try {
       setIsLoading(true);
+      setSaveStatus(null);
+      
       const response = await fetch(`http://45.155.207.218:8012/api/v1/reports/`, {
         method: 'POST',
         headers: {
@@ -266,18 +268,16 @@ export default function HomePage() {
       }
       
       const data = await response.json();
-      toast({
-        title: "Успех",
-        description: "Отчет успешно сохранен",
-        variant: "default",
+      setSaveStatus({
+        message: "Отчет успешно сохранен",
+        type: "success"
       });
     } catch (err: any) {
       console.error('Error saving report:', err);
       setError(err.message || 'Failed to save report. Please try again.');
-      toast({
-        title: "Ошибка",
-        description: "Не удалось сохранить отчет. Пожалуйста, попробуйте снова.",
-        variant: "destructive",
+      setSaveStatus({
+        message: "Не удалось сохранить отчет. Пожалуйста, попробуйте снова.",
+        type: "error"
       });
     } finally {
       setIsLoading(false);
@@ -384,6 +384,12 @@ export default function HomePage() {
                   Save Report
                 </button>
               </div>
+              
+              {saveStatus && (
+                <div className={`p-3 mb-4 rounded-md ${saveStatus.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {saveStatus.message}
+                </div>
+              )}
               
               <div className="bg-gray-700 p-4 rounded-md shadow">
                 <StructuredReportTable 
