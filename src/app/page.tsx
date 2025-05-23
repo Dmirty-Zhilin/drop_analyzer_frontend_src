@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, FormEvent } from 'react';
+import { ReportTable } from '@/components/reports/ReportTable';
 
 // Define types for API responses (can be moved to a types.ts file)
 interface DomainInput {
@@ -208,6 +209,37 @@ export default function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTask?.status, currentTask?.task_id, sseSource]);
 
+  // Функция для сохранения отчета
+  const handleSaveReport = async () => {
+    if (!taskReport || !taskReport.task_id) return;
+    
+    try {
+      setIsLoading(true);
+      const response = await fetch(`http://45.155.207.218:8012/api/v1/reports/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          task_id: taskReport.task_id,
+          report_name: `Report for task ${taskReport.task_id}`,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save report');
+      }
+      
+      const data = await response.json();
+      alert('Отчет успешно сохранен!');
+    } catch (err) {
+      console.error('Error saving report:', err);
+      setError('Failed to save report. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
@@ -268,34 +300,22 @@ export default function HomePage() {
 
       {taskReport && taskReport.results && (
         <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
-          <h2 className="text-2xl font-semibold mb-4 text-white">Analysis Report (Task ID: {taskReport.task_id})</h2>
-          <div className="space-y-6">
-            {taskReport.results.map((result, index) => (
-              <div key={index} className="bg-gray-700 p-4 rounded-md shadow">
-                <h3 className="text-xl font-semibold text-indigo-400 mb-2">{result.domain_name}</h3>
-                {result.wayback_history_summary && (
-                  <div>
-                    <h4 className="text-md font-medium text-gray-300">Wayback History:</h4>
-                    <pre className="text-xs bg-gray-900 p-2 rounded overflow-x-auto text-gray-400">
-                      {JSON.stringify(result.wayback_history_summary, null, 2)}
-                    </pre>
-                  </div>
-                )}
-                {result.thematic_analysis_result && (
-                   <div className="mt-2">
-                    <h4 className="text-md font-medium text-gray-300">Thematic Analysis:</h4>
-                     <pre className="text-xs bg-gray-900 p-2 rounded overflow-x-auto text-gray-400">
-                       {JSON.stringify(result.thematic_analysis_result, null, 2)}
-                     </pre>
-                   </div>
-                )}
-                {/* Add other metrics display here */}
-              </div>
-            ))}
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-semibold text-white">Analysis Report (Task ID: {taskReport.task_id})</h2>
+            <button
+              onClick={handleSaveReport}
+              disabled={isLoading}
+              className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md shadow-sm disabled:opacity-50 transition duration-150 ease-in-out"
+            >
+              Save Report
+            </button>
+          </div>
+          
+          <div className="bg-gray-700 p-4 rounded-md shadow">
+            <ReportTable data={taskReport.results} />
           </div>
         </section>
       )}
     </div>
   );
 }
-

@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ReportTable } from "@/components/reports/ReportTable";
 
 export default function ReportDetailPage() {
   const params = useParams();
@@ -215,6 +216,32 @@ export default function ReportDetailPage() {
           </div>
         </CardContent>
       </Card>
+      
+      {/* Добавляем новый раздел с полным отчетом в виде таблицы */}
+      {report.results && report.results.some(result => 
+        result.wayback_history_summary || 
+        result.seo_metrics || 
+        result.thematic_analysis_result || 
+        result.assessment_score || 
+        result.assessment_summary
+      ) && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Detailed Domain Analysis</CardTitle>
+            <CardDescription>Detailed analysis results for each domain</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ReportTable data={report.results.map(result => ({
+              domain_name: result.domain,
+              wayback_history_summary: result.wayback_history_summary,
+              seo_metrics: result.seo_metrics,
+              thematic_analysis_result: result.thematic_analysis_result,
+              assessment_score: result.assessment_score,
+              assessment_summary: result.assessment_summary
+            }))} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
