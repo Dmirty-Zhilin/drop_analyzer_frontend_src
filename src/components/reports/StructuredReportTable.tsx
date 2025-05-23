@@ -10,7 +10,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, ChevronUp, Filter, CheckCircle, Clock, Calendar } from "lucide-react";
+import { ChevronDown, ChevronUp, Filter, CheckCircle, Clock, Calendar, RefreshCw } from "lucide-react";
 
 // Типы данных
 interface DomainAnalysisResult {
@@ -201,67 +201,75 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
   }
   
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 font-rubik">
       {/* Панель фильтров */}
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-700 shadow-md">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Фильтры</h3>
-          <Button variant="outline" size="sm" onClick={resetFilters} className="dark:text-white dark:border-gray-600">Сбросить</Button>
+      <div className="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-lg">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white">Фильтры</h3>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={resetFilters} 
+            className="bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 border-0 shadow-md flex items-center gap-1"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Сбросить
+          </Button>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Мин. снимков</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Мин. снимков</label>
             <Input 
               type="number" 
               value={filters.minSnapshots} 
               onChange={(e) => handleFilterChange('minSnapshots', parseInt(e.target.value) || 0)}
-              className="mt-1 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+              className="shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-0 text-black dark:text-white dark:bg-gray-700 border-0"
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Мин. лет</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Мин. лет</label>
             <Input 
               type="number" 
               value={filters.minYears} 
               onChange={(e) => handleFilterChange('minYears', parseInt(e.target.value) || 0)}
-              className="mt-1 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+              className="shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-0 text-black dark:text-white dark:bg-gray-700 border-0"
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Макс. интервал (дни)</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Макс. интервал (дни)</label>
             <Input 
               type="number" 
               value={filters.maxAvgInterval} 
               onChange={(e) => handleFilterChange('maxAvgInterval', parseInt(e.target.value) || 0)}
-              className="mt-1 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+              className="shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-0 text-black dark:text-white dark:bg-gray-700 border-0"
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Макс. промежуток (дни)</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Макс. промежуток (дни)</label>
             <Input 
               type="number" 
               value={filters.maxGap} 
               onChange={(e) => handleFilterChange('maxGap', parseInt(e.target.value) || 0)}
-              className="mt-1 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+              className="shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-0 text-black dark:text-white dark:bg-gray-700 border-0"
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Мин. timemap</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Мин. timemap</label>
             <Input 
               type="number" 
               value={filters.minTimemap} 
               onChange={(e) => handleFilterChange('minTimemap', parseInt(e.target.value) || 0)}
-              className="mt-1 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+              className="shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-0 text-black dark:text-white dark:bg-gray-700 border-0"
             />
           </div>
-          <div className="flex items-center space-x-4 mt-6">
+          <div className="flex items-center space-x-6 mt-8">
             <label className="flex items-center space-x-2">
               <input 
                 type="checkbox" 
                 checked={filters.showRecommended} 
                 onChange={(e) => handleFilterChange('showRecommended', e.target.checked)}
-                className="rounded dark:bg-gray-700 dark:border-gray-600"
+                className="rounded shadow-sm w-4 h-4 text-blue-600 focus:ring-blue-500 dark:bg-gray-700 dark:border-0"
               />
               <span className="text-gray-700 dark:text-gray-300">Только рекомендуемые</span>
             </label>
@@ -270,7 +278,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 type="checkbox" 
                 checked={filters.showLongLive} 
                 onChange={(e) => handleFilterChange('showLongLive', e.target.checked)}
-                className="rounded dark:bg-gray-700 dark:border-gray-600"
+                className="rounded shadow-sm w-4 h-4 text-blue-600 focus:ring-blue-500 dark:bg-gray-700 dark:border-0"
               />
               <span className="text-gray-700 dark:text-gray-300">Только long-live</span>
             </label>
@@ -279,7 +287,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
       </div>
       
       {/* Легенда */}
-      <div className="flex flex-wrap items-center gap-6 mb-2 p-3 bg-gray-800 rounded-md shadow-md">
+      <div className="flex flex-wrap items-center gap-6 mb-2 p-4 bg-gray-800 rounded-lg shadow-lg">
         <div className="flex items-center">
           <div className="flex items-center justify-center w-8 h-8 bg-green-600 rounded-md shadow-lg mr-2">
             <CheckCircle className="h-5 w-5 text-white" />
@@ -299,7 +307,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
         <div className="flex justify-end mb-4">
           <Button 
             onClick={onSaveReport} 
-            className="bg-green-600 hover:bg-green-700 text-white shadow-md flex items-center gap-2"
+            className="bg-green-600 hover:bg-green-700 text-white shadow-lg flex items-center gap-2"
           >
             <CheckCircle className="h-4 w-4" />
             Сохранить отчет
@@ -308,12 +316,12 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
       )}
       
       {/* Таблица */}
-      <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700 shadow-lg">
+      <div className="overflow-x-auto rounded-lg shadow-xl">
         <Table className="w-full">
           <TableHeader className="bg-gray-100 dark:bg-gray-800">
-            <TableRow>
+            <TableRow className="border-0">
               <TableHead 
-                className="cursor-pointer font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
                 onClick={() => handleSort('domain')}
               >
                 Домен {sortField === 'domain' && (
@@ -321,7 +329,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
                 onClick={() => handleSort('total_snapshots')}
               >
                 Снимки {sortField === 'total_snapshots' && (
@@ -329,7 +337,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
                 onClick={() => handleSort('first_snapshot')}
               >
                 Первый снимок {sortField === 'first_snapshot' && (
@@ -337,7 +345,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
                 onClick={() => handleSort('last_snapshot')}
               >
                 Последний снимок {sortField === 'last_snapshot' && (
@@ -345,7 +353,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
                 onClick={() => handleSort('years_covered')}
               >
                 Лет {sortField === 'years_covered' && (
@@ -353,7 +361,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
                 onClick={() => handleSort('avg_interval_days')}
               >
                 Ср. интервал {sortField === 'avg_interval_days' && (
@@ -361,7 +369,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
                 onClick={() => handleSort('max_gap_days')}
               >
                 Макс. промежуток {sortField === 'max_gap_days' && (
@@ -369,7 +377,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
                 onClick={() => handleSort('timemap_count')}
               >
                 Timemap {sortField === 'timemap_count' && (
@@ -377,16 +385,16 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
                 onClick={() => handleSort('recommended')}
               >
                 Рекомендуемый {sortField === 'recommended' && (
                   sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
                 )}
               </TableHead>
-              <TableHead className="font-bold text-gray-900 dark:text-white">SEO</TableHead>
-              <TableHead className="font-bold text-gray-900 dark:text-white">Тематика</TableHead>
-              <TableHead className="font-bold text-gray-900 dark:text-white">Оценка</TableHead>
+              <TableHead className="text-sm font-bold text-gray-900 dark:text-white border-0">SEO</TableHead>
+              <TableHead className="text-sm font-bold text-gray-900 dark:text-white border-0">Тематика</TableHead>
+              <TableHead className="text-sm font-bold text-gray-900 dark:text-white border-0">Оценка</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -395,35 +403,35 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
               const waybackData = getWaybackData(item);
               
               return (
-                <TableRow key={index} className={getRowStyle(item)}>
-                  <TableCell className="font-medium">{item.domain}</TableCell>
-                  <TableCell>{item.total_snapshots || waybackData.total_snapshots || '-'}</TableCell>
-                  <TableCell>{formatDate(item.first_snapshot || waybackData.first_snapshot)}</TableCell>
-                  <TableCell>{formatDate(item.last_snapshot || waybackData.last_snapshot)}</TableCell>
-                  <TableCell>{item.years_covered || waybackData.years_covered || '-'}</TableCell>
-                  <TableCell>
+                <TableRow key={index} className={`${getRowStyle(item)} border-0`}>
+                  <TableCell className="font-semibold border-0">{item.domain}</TableCell>
+                  <TableCell className="border-0">{item.total_snapshots || waybackData.total_snapshots || '-'}</TableCell>
+                  <TableCell className="border-0">{formatDate(item.first_snapshot || waybackData.first_snapshot)}</TableCell>
+                  <TableCell className="border-0">{formatDate(item.last_snapshot || waybackData.last_snapshot)}</TableCell>
+                  <TableCell className="border-0">{item.years_covered || waybackData.years_covered || '-'}</TableCell>
+                  <TableCell className="border-0">
                     {item.avg_interval_days !== undefined 
                       ? item.avg_interval_days.toFixed(2) 
                       : waybackData.avg_interval_days !== undefined 
                         ? waybackData.avg_interval_days.toFixed(2) 
                         : '-'}
                   </TableCell>
-                  <TableCell>{item.max_gap_days || waybackData.max_gap_days || '-'}</TableCell>
-                  <TableCell>{item.timemap_count || waybackData.timemap_count || '-'}</TableCell>
-                  <TableCell>
+                  <TableCell className="border-0">{item.max_gap_days || waybackData.max_gap_days || '-'}</TableCell>
+                  <TableCell className="border-0">{item.timemap_count || waybackData.timemap_count || '-'}</TableCell>
+                  <TableCell className="border-0">
                     {item.recommended ? (
-                      <Badge className="bg-green-500 text-white hover:bg-green-600 shadow-sm">Да</Badge>
+                      <Badge className="bg-green-500 text-white hover:bg-green-600 shadow-md">Да</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 shadow-sm">Нет</Badge>
+                      <Badge className="bg-gray-200 text-gray-800 hover:bg-gray-300 shadow-md">Нет</Badge>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="border-0">
                     {item.seo_metrics ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 shadow-sm">Просмотр</Button>
+                          <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 shadow-md border-0">Просмотр</Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg">
+                        <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-gray-800 shadow-xl border-0">
                           <DropdownMenuItem className="flex flex-col items-start">
                             <span className="font-medium mb-1 text-gray-900 dark:text-white">SEO метрики:</span>
                             <pre className="text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded w-full overflow-x-auto text-gray-800 dark:text-gray-200">
@@ -436,16 +444,16 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                       <span className="text-gray-500 dark:text-gray-400">Нет данных</span>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="border-0">
                     {item.thematic_analysis_result ? (
                       item.thematic_analysis_result.error ? (
                         <span className="text-red-500 text-xs">{item.thematic_analysis_result.error}</span>
                       ) : (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 shadow-sm">Просмотр</Button>
+                            <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 shadow-md border-0">Просмотр</Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg">
+                          <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-gray-800 shadow-xl border-0">
                             <DropdownMenuItem className="flex flex-col items-start">
                               <span className="font-medium mb-1 text-gray-900 dark:text-white">Тематический анализ:</span>
                               <pre className="text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded w-full overflow-x-auto text-gray-800 dark:text-gray-200">
@@ -459,7 +467,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                       <span className="text-gray-500 dark:text-gray-400">Нет данных</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-gray-900 dark:text-white">{item.assessment_summary || 'Ожидается'}</TableCell>
+                  <TableCell className="text-gray-900 dark:text-white font-medium border-0">{item.assessment_summary || 'Ожидается'}</TableCell>
                 </TableRow>
               );
             })}
