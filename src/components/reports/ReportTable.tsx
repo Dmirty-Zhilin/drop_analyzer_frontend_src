@@ -1,5 +1,4 @@
 "use client";
-
 import React from 'react';
 
 // Определение типов данных для отчета
