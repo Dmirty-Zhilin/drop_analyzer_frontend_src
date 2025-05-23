@@ -71,17 +71,17 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
     const isCurrentYear = lastSnapshotYear === currentYear;
     
     if (isLongLive) {
-      return "bg-green-50";
+      return "bg-green-200 hover:bg-green-300";
     } else if (isCurrentYear) {
-      return "bg-orange-50";
+      return "bg-orange-200 hover:bg-orange-300";
     }
     
-    return "";
+    return "hover:bg-gray-100";
   };
   
   // Форматирование даты
   const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return '-';
     try {
       const date = new Date(dateString);
       return date.toLocaleString();
@@ -173,6 +173,29 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
     });
   };
   
+  // Получение данных из wayback_history_summary
+  const getWaybackData = (item: DomainAnalysisResult) => {
+    if (!item.wayback_history_summary) return {
+      total_snapshots: 0,
+      first_snapshot: null,
+      last_snapshot: null,
+      years_covered: 0,
+      avg_interval_days: 0,
+      max_gap_days: 0,
+      timemap_count: 0
+    };
+    
+    return {
+      total_snapshots: item.wayback_history_summary.total_snapshots || 0,
+      first_snapshot: item.wayback_history_summary.first_snapshot || null,
+      last_snapshot: item.wayback_history_summary.last_snapshot || null,
+      years_covered: item.wayback_history_summary.years_covered || 0,
+      avg_interval_days: item.wayback_history_summary.avg_interval_days || 0,
+      max_gap_days: item.wayback_history_summary.max_gap_days || 0,
+      timemap_count: item.wayback_history_summary.timemap_count || 0
+    };
+  };
+  
   if (!data || data.length === 0) {
     return <div className="p-4 text-center text-gray-500">Нет данных для отображения</div>;
   }
@@ -180,15 +203,15 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
   return (
     <div className="space-y-4">
       {/* Панель фильтров */}
-      <div className="bg-gray-50 p-4 rounded-md border">
+      <div className="bg-white p-4 rounded-md border shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium">Фильтры</h3>
+          <h3 className="text-lg font-medium text-gray-900">Фильтры</h3>
           <Button variant="outline" size="sm" onClick={resetFilters}>Сбросить</Button>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="text-sm font-medium">Мин. снимков</label>
+            <label className="text-sm font-medium text-gray-700">Мин. снимков</label>
             <Input 
               type="number" 
               value={filters.minSnapshots} 
@@ -197,7 +220,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Мин. лет</label>
+            <label className="text-sm font-medium text-gray-700">Мин. лет</label>
             <Input 
               type="number" 
               value={filters.minYears} 
@@ -206,7 +229,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Макс. интервал (дни)</label>
+            <label className="text-sm font-medium text-gray-700">Макс. интервал (дни)</label>
             <Input 
               type="number" 
               value={filters.maxAvgInterval} 
@@ -215,7 +238,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Макс. промежуток (дни)</label>
+            <label className="text-sm font-medium text-gray-700">Макс. промежуток (дни)</label>
             <Input 
               type="number" 
               value={filters.maxGap} 
@@ -224,7 +247,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Мин. timemap</label>
+            <label className="text-sm font-medium text-gray-700">Мин. timemap</label>
             <Input 
               type="number" 
               value={filters.minTimemap} 
@@ -240,7 +263,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 onChange={(e) => handleFilterChange('showRecommended', e.target.checked)}
                 className="rounded"
               />
-              <span>Только рекомендуемые</span>
+              <span className="text-gray-700">Только рекомендуемые</span>
             </label>
             <label className="flex items-center space-x-2">
               <input 
@@ -249,7 +272,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 onChange={(e) => handleFilterChange('showLongLive', e.target.checked)}
                 className="rounded"
               />
-              <span>Только long-live</span>
+              <span className="text-gray-700">Только long-live</span>
             </label>
           </div>
         </div>
@@ -258,31 +281,31 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
       {/* Легенда */}
       <div className="flex items-center gap-4 mb-2">
         <div className="flex items-center">
-          <div className="w-4 h-4 bg-green-50 border border-green-200 mr-2"></div>
-          <span className="text-xs">Long-live домены</span>
+          <div className="w-4 h-4 bg-green-200 border border-green-300 mr-2"></div>
+          <span className="text-sm font-medium text-gray-700">Long-live домены</span>
         </div>
         <div className="flex items-center">
-          <div className="w-4 h-4 bg-orange-50 border border-orange-200 mr-2"></div>
-          <span className="text-xs">Последний снимок в текущем году</span>
+          <div className="w-4 h-4 bg-orange-200 border border-orange-300 mr-2"></div>
+          <span className="text-sm font-medium text-gray-700">Последний снимок в текущем году</span>
         </div>
       </div>
       
       {/* Кнопка сохранения отчета */}
       {onSaveReport && (
         <div className="flex justify-end mb-4">
-          <Button onClick={onSaveReport} className="bg-green-600 hover:bg-green-700">
+          <Button onClick={onSaveReport} className="bg-green-600 hover:bg-green-700 text-white">
             Сохранить отчет
           </Button>
         </div>
       )}
       
       {/* Таблица */}
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-md border shadow">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-gray-100">
             <TableRow>
               <TableHead 
-                className="cursor-pointer"
+                className="cursor-pointer font-bold text-gray-900 hover:bg-gray-200"
                 onClick={() => handleSort('domain')}
               >
                 Домен {sortField === 'domain' && (
@@ -290,7 +313,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer"
+                className="cursor-pointer font-bold text-gray-900 hover:bg-gray-200"
                 onClick={() => handleSort('total_snapshots')}
               >
                 Снимки {sortField === 'total_snapshots' && (
@@ -298,7 +321,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer"
+                className="cursor-pointer font-bold text-gray-900 hover:bg-gray-200"
                 onClick={() => handleSort('first_snapshot')}
               >
                 Первый снимок {sortField === 'first_snapshot' && (
@@ -306,7 +329,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer"
+                className="cursor-pointer font-bold text-gray-900 hover:bg-gray-200"
                 onClick={() => handleSort('last_snapshot')}
               >
                 Последний снимок {sortField === 'last_snapshot' && (
@@ -314,7 +337,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer"
+                className="cursor-pointer font-bold text-gray-900 hover:bg-gray-200"
                 onClick={() => handleSort('years_covered')}
               >
                 Лет {sortField === 'years_covered' && (
@@ -322,7 +345,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer"
+                className="cursor-pointer font-bold text-gray-900 hover:bg-gray-200"
                 onClick={() => handleSort('avg_interval_days')}
               >
                 Ср. интервал {sortField === 'avg_interval_days' && (
@@ -330,7 +353,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer"
+                className="cursor-pointer font-bold text-gray-900 hover:bg-gray-200"
                 onClick={() => handleSort('max_gap_days')}
               >
                 Макс. промежуток {sortField === 'max_gap_days' && (
@@ -338,7 +361,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer"
+                className="cursor-pointer font-bold text-gray-900 hover:bg-gray-200"
                 onClick={() => handleSort('timemap_count')}
               >
                 Timemap {sortField === 'timemap_count' && (
@@ -346,88 +369,98 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                 )}
               </TableHead>
               <TableHead 
-                className="cursor-pointer"
+                className="cursor-pointer font-bold text-gray-900 hover:bg-gray-200"
                 onClick={() => handleSort('recommended')}
               >
                 Рекомендуемый {sortField === 'recommended' && (
                   sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
                 )}
               </TableHead>
-              <TableHead>SEO</TableHead>
-              <TableHead>Тематика</TableHead>
-              <TableHead>Оценка</TableHead>
+              <TableHead className="font-bold text-gray-900">SEO</TableHead>
+              <TableHead className="font-bold text-gray-900">Тематика</TableHead>
+              <TableHead className="font-bold text-gray-900">Оценка</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedData.map((item, index) => (
-              <TableRow key={index} className={getRowStyle(item)}>
-                <TableCell className="font-medium">{item.domain}</TableCell>
-                <TableCell>{item.total_snapshots || 'N/A'}</TableCell>
-                <TableCell>{formatDate(item.first_snapshot)}</TableCell>
-                <TableCell>{formatDate(item.last_snapshot)}</TableCell>
-                <TableCell>{item.years_covered || 'N/A'}</TableCell>
-                <TableCell>{item.avg_interval_days?.toFixed(2) || 'N/A'}</TableCell>
-                <TableCell>{item.max_gap_days || 'N/A'}</TableCell>
-                <TableCell>{item.timemap_count || 'N/A'}</TableCell>
-                <TableCell>
-                  {item.recommended ? (
-                    <Badge variant="success">Да</Badge>
-                  ) : (
-                    <Badge variant="outline">Нет</Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {item.seo_metrics ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">Просмотр</Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-[300px]">
-                        <DropdownMenuItem className="flex flex-col items-start">
-                          <span className="font-medium mb-1">SEO метрики:</span>
-                          <pre className="text-xs bg-gray-50 p-2 rounded w-full overflow-x-auto">
-                            {JSON.stringify(item.seo_metrics, null, 2)}
-                          </pre>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <span className="text-gray-400">Нет данных</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {item.thematic_analysis_result ? (
-                    item.thematic_analysis_result.error ? (
-                      <span className="text-red-500 text-xs">{item.thematic_analysis_result.error}</span>
+            {sortedData.map((item, index) => {
+              // Получаем данные из wayback_history_summary если основные поля пустые
+              const waybackData = getWaybackData(item);
+              
+              return (
+                <TableRow key={index} className={getRowStyle(item)}>
+                  <TableCell className="font-medium text-gray-900">{item.domain}</TableCell>
+                  <TableCell className="text-gray-900">{item.total_snapshots || waybackData.total_snapshots || '-'}</TableCell>
+                  <TableCell className="text-gray-900">{formatDate(item.first_snapshot || waybackData.first_snapshot)}</TableCell>
+                  <TableCell className="text-gray-900">{formatDate(item.last_snapshot || waybackData.last_snapshot)}</TableCell>
+                  <TableCell className="text-gray-900">{item.years_covered || waybackData.years_covered || '-'}</TableCell>
+                  <TableCell className="text-gray-900">
+                    {item.avg_interval_days !== undefined 
+                      ? item.avg_interval_days.toFixed(2) 
+                      : waybackData.avg_interval_days !== undefined 
+                        ? waybackData.avg_interval_days.toFixed(2) 
+                        : '-'}
+                  </TableCell>
+                  <TableCell className="text-gray-900">{item.max_gap_days || waybackData.max_gap_days || '-'}</TableCell>
+                  <TableCell className="text-gray-900">{item.timemap_count || waybackData.timemap_count || '-'}</TableCell>
+                  <TableCell>
+                    {item.recommended ? (
+                      <Badge className="bg-green-500 text-white hover:bg-green-600">Да</Badge>
                     ) : (
+                      <Badge variant="outline" className="text-gray-700 border-gray-300">Нет</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {item.seo_metrics ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm">Просмотр</Button>
+                          <Button variant="outline" size="sm" className="bg-white text-gray-700 hover:bg-gray-100">Просмотр</Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-[300px]">
+                        <DropdownMenuContent align="end" className="w-[300px] bg-white border border-gray-200 shadow-lg">
                           <DropdownMenuItem className="flex flex-col items-start">
-                            <span className="font-medium mb-1">Тематический анализ:</span>
-                            <pre className="text-xs bg-gray-50 p-2 rounded w-full overflow-x-auto">
-                              {JSON.stringify(item.thematic_analysis_result, null, 2)}
+                            <span className="font-medium mb-1 text-gray-900">SEO метрики:</span>
+                            <pre className="text-xs bg-gray-50 p-2 rounded w-full overflow-x-auto text-gray-800">
+                              {JSON.stringify(item.seo_metrics, null, 2)}
                             </pre>
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    )
-                  ) : (
-                    <span className="text-gray-400">Нет данных</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {item.assessment_summary || 'Нет данных'}
-                </TableCell>
-              </TableRow>
-            ))}
+                    ) : (
+                      <span className="text-gray-500">Нет данных</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {item.thematic_analysis_result ? (
+                      item.thematic_analysis_result.error ? (
+                        <span className="text-red-500 text-xs">{item.thematic_analysis_result.error}</span>
+                      ) : (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="bg-white text-gray-700 hover:bg-gray-100">Просмотр</Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-[300px] bg-white border border-gray-200 shadow-lg">
+                            <DropdownMenuItem className="flex flex-col items-start">
+                              <span className="font-medium mb-1 text-gray-900">Тематический анализ:</span>
+                              <pre className="text-xs bg-gray-50 p-2 rounded w-full overflow-x-auto text-gray-800">
+                                {JSON.stringify(item.thematic_analysis_result, null, 2)}
+                              </pre>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )
+                    ) : (
+                      <span className="text-gray-500">Нет данных</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-gray-900">{item.assessment_summary || 'Ожидается'}</TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
       
-      <div className="text-sm text-gray-500 mt-2">
+      {/* Информация о количестве записей */}
+      <div className="text-sm text-gray-500">
         Показано {sortedData.length} из {data.length} доменов
       </div>
     </div>
