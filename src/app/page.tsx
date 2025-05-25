@@ -346,15 +346,25 @@ export default function HomePage() {
     try {
       const filename = `domain_analysis_${taskReport.task_id}`;
       
+      // Преобразуем данные в формат, ожидаемый функциями экспорта
+      const formattedResults = taskReport.results.map(result => ({
+        domain: result.domain_name,
+        wayback_history_summary: result.wayback_history_summary,
+        seo_metrics: result.seo_metrics,
+        thematic_analysis_result: result.thematic_analysis_result,
+        assessment_score: result.assessment_score,
+        assessment_summary: result.assessment_summary
+      }));
+      
       switch (format) {
         case 'csv':
-          exportToCSV(taskReport.results, filename);
+          exportToCSV(formattedResults, filename);
           break;
         case 'excel':
-          exportToExcel(taskReport.results, filename);
+          exportToExcel(formattedResults, filename);
           break;
         case 'json':
-          exportToJSON(taskReport.results, filename);
+          exportToJSON(formattedResults, filename);
           break;
       }
     } catch (err: any) {
@@ -422,95 +432,69 @@ export default function HomePage() {
                       </div>
                     </div>
                   </div>
-                  <p className="text-center text-yellow-400 mt-2">{currentTask.message || "Processing... please wait."}</p>
                 </div>
               )}
             </section>
           )}
 
-          {taskReport && taskReport.results && (
+          {taskReport && taskReport.results && taskReport.results.length > 0 && (
             <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-semibold text-white">Analysis Report (Task ID: {taskReport.task_id})</h2>
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={handleSaveReport}
-                    disabled={isLoading}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    Save Report
-                  </Button>
-                  
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="flex items-center gap-2">
-                        <DownloadIcon className="h-4 w-4" />
-                        Download
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem onClick={() => handleDownloadReport('csv')}>
-                        <FileIcon className="mr-2 h-4 w-4" />
-                        <span>CSV Format</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDownloadReport('excel')}>
-                        <FileIcon className="mr-2 h-4 w-4" />
-                        <span>Excel Format</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDownloadReport('json')}>
-                        <FileIcon className="mr-2 h-4 w-4" />
-                        <span>JSON Format</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-semibold text-white">Analysis Results</h2>
+                
+                {/* Кнопка скачивания отчета */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button className="bg-green-600 hover:bg-green-700 text-white">
+                      <DownloadIcon className="mr-2 h-4 w-4" />
+                      Сохранить отчет
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleDownloadReport('excel')}>
+                      <FileIcon className="mr-2 h-4 w-4" />
+                      <span>Excel (.xlsx)</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDownloadReport('csv')}>
+                      <FileIcon className="mr-2 h-4 w-4" />
+                      <span>CSV (.csv)</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDownloadReport('json')}>
+                      <FileIcon className="mr-2 h-4 w-4" />
+                      <span>JSON (.json)</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               
+              {/* Отображение результатов в табличном виде */}
+              <StructuredReportTable 
+                data={taskReport.results.map(result => ({
+                  domain: result.domain_name,
+                  wayback_history_summary: result.wayback_history_summary,
+                  seo_metrics: result.seo_metrics,
+                  thematic_analysis_result: result.thematic_analysis_result,
+                  assessment_score: result.assessment_score,
+                  assessment_summary: result.assessment_summary
+                }))} 
+                onSaveReport={handleSaveReport}
+              />
+              
               {saveStatus && (
-                <div className={`p-3 mb-4 rounded-md ${saveStatus.type === 'success' ? 'bg-green-800 text-green-200' : 'bg-red-800 text-red-200'}`}>
+                <div className={`mt-4 p-3 rounded-md ${saveStatus.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                   {saveStatus.message}
                 </div>
               )}
-              
-              <div className="space-y-6">
-                {taskReport.results.map((result, index) => (
-                  <div key={index} className="bg-gray-700 p-4 rounded-md shadow">
-                    <h3 className="text-xl font-semibold text-indigo-400 mb-2">{result.domain_name}</h3>
-                    
-                    <StructuredReportTable 
-                      data={result} 
-                      title="Domain Analysis" 
-                    />
-                    
-                    {result.assessment_score !== undefined && (
-                      <div className="mt-4">
-                        <h4 className="text-md font-medium text-gray-300">Оценка:</h4>
-                        <div className="text-2xl font-bold text-indigo-400 mt-1">
-                          {result.assessment_score}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {result.assessment_summary && (
-                      <div className="mt-4">
-                        <h4 className="text-md font-medium text-gray-300">Резюме оценки:</h4>
-                        <p className="text-gray-300 mt-1">{result.assessment_summary}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
             </section>
           )}
         </TabsContent>
         
         <TabsContent value="settings">
           <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
-            <h2 className="text-2xl font-semibold mb-4 text-white">API Settings</h2>
+            <h2 className="text-2xl font-semibold mb-6 text-white">API Settings</h2>
             <ApiSettings 
               initialSettings={apiSettings}
               onSave={handleSaveApiSettings}
-              apiAvailable={apiAvailable}
             />
           </section>
         </TabsContent>

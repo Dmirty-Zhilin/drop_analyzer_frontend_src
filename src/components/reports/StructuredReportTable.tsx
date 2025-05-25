@@ -71,13 +71,13 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
     const isCurrentYear = lastSnapshotYear === currentYear;
     
     if (isLongLive) {
-      return "bg-green-600 text-white hover:bg-green-700";
+      return "bg-green-600 text-white"; // Убрано hover:bg-green-700
     } else if (isCurrentYear) {
-      return "bg-orange-500 text-white hover:bg-orange-600";
+      return "bg-orange-500 text-white"; // Убрано hover:bg-orange-600
     }
     
-    // Изменено: заменен белый фон на затемнение при наведении
-    return "hover:bg-gray-800 dark:hover:bg-gray-900";
+    // Убраны все hover-классы, т.к. они конфликтуют с библиотечными стилями
+    return "";
   };
   
   // Форматирование даты
@@ -377,6 +377,38 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                   sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
                 )}
               </TableHead>
+              <TableHead 
+                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
+                onClick={() => handleSort('timemap_count')}
+              >
+                Timemap {sortField === 'timemap_count' && (
+                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
+                )}
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
+                onClick={() => handleSort('recommended')}
+              >
+                Рекомендуемый {sortField === 'recommended' && (
+                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
+                )}
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
+                onClick={() => handleSort('seo_metrics')}
+              >
+                SEO {sortField === 'seo_metrics' && (
+                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
+                )}
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
+                onClick={() => handleSort('assessment_score')}
+              >
+                Оценка {sortField === 'assessment_score' && (
+                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
+                )}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -384,21 +416,58 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
               const waybackData = getWaybackData(item);
               return (
                 <TableRow 
-                  key={index} 
-                  className={`${getRowStyle(item)} transition-colors duration-200`}
+                  key={`${item.domain}-${index}`} 
+                  className={getRowStyle(item)}
                 >
                   <TableCell className="font-medium">{item.domain}</TableCell>
-                  <TableCell>{waybackData.total_snapshots || '-'}</TableCell>
+                  <TableCell>{waybackData.total_snapshots}</TableCell>
                   <TableCell>{formatDate(waybackData.first_snapshot)}</TableCell>
                   <TableCell>{formatDate(waybackData.last_snapshot)}</TableCell>
-                  <TableCell>{waybackData.years_covered || '-'}</TableCell>
-                  <TableCell>{waybackData.avg_interval_days ? Math.round(waybackData.avg_interval_days) : '-'}</TableCell>
-                  <TableCell>{waybackData.max_gap_days ? Math.round(waybackData.max_gap_days) : '-'}</TableCell>
+                  <TableCell>{waybackData.years_covered}</TableCell>
+                  <TableCell>{waybackData.avg_interval_days?.toFixed(2)}</TableCell>
+                  <TableCell>{waybackData.max_gap_days}</TableCell>
+                  <TableCell>{waybackData.timemap_count}</TableCell>
+                  <TableCell>
+                    {item.recommended ? (
+                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">Да</Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">Нет</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {item.seo_metrics ? (
+                      <Button variant="outline" size="sm" className="text-xs">
+                        Просмотр
+                      </Button>
+                    ) : (
+                      <span className="text-gray-400">Н/Д</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {item.assessment_score !== undefined ? (
+                      <div className="flex items-center">
+                        <span className={`font-semibold ${
+                          item.assessment_score >= 7 ? 'text-green-600' : 
+                          item.assessment_score >= 5 ? 'text-yellow-600' : 
+                          'text-red-600'
+                        }`}>
+                          {item.assessment_score.toFixed(1)}
+                        </span>
+                        <span className="text-gray-400 text-xs ml-1">/10</span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">Н/Д</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
+      </div>
+      
+      <div className="text-right text-sm text-gray-500 dark:text-gray-400">
+        Показано {sortedData.length} из {data.length} доменов
       </div>
     </div>
   );
