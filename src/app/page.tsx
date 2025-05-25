@@ -39,7 +39,7 @@ interface ApiSettings {
   enableThematicAnalysis: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1/analysis';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8012/api/v1';
 
 export default function HomePage() {
   const [domainsInput, setDomainsInput] = useState<string>("");
@@ -48,6 +48,7 @@ export default function HomePage() {
   const [taskReport, setTaskReport] = useState<AnalysisFullReportResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sseSource, setSseSource] = useState<EventSource | null>(null);
+  const [apiAvailable, setApiAvailable] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>("analysis");
   const [apiSettings, setApiSettings] = useState<ApiSettings>({
     openRouterApiKey: '',
@@ -55,24 +56,44 @@ export default function HomePage() {
   });
   const [saveStatus, setSaveStatus] = useState<{message: string, type: 'success' | 'error'} | null>(null);
 
-  // Загрузка настроек API при инициализации
+  // Проверка доступности API и загрузка настроек при инициализации
   useEffect(() => {
-    const loadApiSettings = async () => {
+    const verifyApiAndLoadSettings = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/settings`);
+        // Проверяем доступность API
+        const response = await fetch(`${API_BASE_URL}`, { 
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(5000)
+        });
+        
+        setApiAvailable(response.ok);
+        
         if (response.ok) {
-          const data = await response.json();
-          setApiSettings({
-            openRouterApiKey: data.openRouterApiKey || '',
-            enableThematicAnalysis: data.enableThematicAnalysis || false
-          });
+          // Если API доступен, загружаем настройки
+          try {
+            const settingsResponse = await fetch(`${API_BASE_URL}/settings`);
+            if (settingsResponse.ok) {
+              const data = await settingsResponse.json();
+              setApiSettings({
+                openRouterApiKey: data.openRouterApiKey || '',
+                enableThematicAnalysis: data.enableThematicAnalysis || false
+              });
+            }
+          } catch (settingsError) {
+            console.error('Failed to load API settings:', settingsError);
+          }
+        } else {
+          setError('API сервер вернул ошибку. Пожалуйста, проверьте настройки сервера.');
         }
       } catch (error) {
-        console.error('Failed to load API settings:', error);
+        console.error('API недоступен:', error);
+        setApiAvailable(false);
+        setError('API сервер недоступен. Пожалуйста, проверьте подключение к серверу.');
       }
     };
     
-    loadApiSettings();
+    verifyApiAndLoadSettings();
   }, []);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -249,7 +270,7 @@ export default function HomePage() {
       setIsLoading(true);
       setSaveStatus(null);
       
-      const response = await fetch(`http://45.155.207.218:8012/api/v1/reports/`, {
+      const response = await fetch(`${API_BASE_URL}/reports/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
