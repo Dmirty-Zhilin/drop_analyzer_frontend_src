@@ -4,7 +4,7 @@ import { StructuredReportTable } from '@/components/reports/StructuredReportTabl
 import { ApiSettings } from '@/components/settings/ApiSettings';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { DownloadIcon, FileIcon } from "lucide-react";
+import { DownloadIcon, FileIcon, Save } from "lucide-react";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -64,6 +64,7 @@ export default function HomePage() {
     enableThematicAnalysis: false
   });
   const [saveStatus, setSaveStatus] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+  const [downloadStatus, setDownloadStatus] = useState<{message: string, type: 'success' | 'error'} | null>(null);
 
   // Проверка доступности API и загрузка настроек при инициализации
   useEffect(() => {
@@ -340,10 +341,15 @@ export default function HomePage() {
   const handleDownloadReport = (format: 'csv' | 'excel' | 'json') => {
     if (!taskReport?.results || taskReport.results.length === 0) {
       setError('No report data available to download');
+      setDownloadStatus({
+        message: "Нет данных для скачивания",
+        type: "error"
+      });
       return;
     }
 
     try {
+      setDownloadStatus(null);
       const filename = `domain_analysis_${taskReport.task_id}`;
       
       // Преобразуем данные в формат, ожидаемый функциями экспорта
@@ -356,6 +362,9 @@ export default function HomePage() {
         assessment_summary: result.assessment_summary
       }));
       
+      console.log("Downloading report in format:", format);
+      console.log("Data to export:", formattedResults);
+      
       switch (format) {
         case 'csv':
           exportToCSV(formattedResults, filename);
@@ -367,9 +376,18 @@ export default function HomePage() {
           exportToJSON(formattedResults, filename);
           break;
       }
+      
+      setDownloadStatus({
+        message: `Отчет успешно скачан в формате ${format.toUpperCase()}`,
+        type: "success"
+      });
     } catch (err: any) {
       console.error('Error downloading report:', err);
       setError('Failed to download report. Please try again.');
+      setDownloadStatus({
+        message: "Не удалось скачать отчет. Пожалуйста, попробуйте снова.",
+        type: "error"
+      });
     }
   };
 
@@ -439,33 +457,65 @@ export default function HomePage() {
 
           {taskReport && taskReport.results && taskReport.results.length > 0 && (
             <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                 <h2 className="text-2xl font-semibold text-white">Analysis Results</h2>
                 
-                {/* Кнопка скачивания отчета */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button className="bg-green-600 hover:bg-green-700 text-white">
+                <div className="flex flex-col md:flex-row gap-4">
+                  {/* Кнопка сохранения отчета в базу данных */}
+                  <Button 
+                    onClick={handleSaveReport}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    disabled={isLoading}
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    Сохранить в БД
+                  </Button>
+                  
+                  {/* Кнопки скачивания отчета */}
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => handleDownloadReport('excel')}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      disabled={isLoading}
+                    >
                       <DownloadIcon className="mr-2 h-4 w-4" />
-                      Сохранить отчет
+                      Excel
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => handleDownloadReport('excel')}>
-                      <FileIcon className="mr-2 h-4 w-4" />
-                      <span>Excel (.xlsx)</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDownloadReport('csv')}>
-                      <FileIcon className="mr-2 h-4 w-4" />
-                      <span>CSV (.csv)</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDownloadReport('json')}>
-                      <FileIcon className="mr-2 h-4 w-4" />
-                      <span>JSON (.json)</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    
+                    <Button 
+                      onClick={() => handleDownloadReport('csv')}
+                      className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                      disabled={isLoading}
+                    >
+                      <DownloadIcon className="mr-2 h-4 w-4" />
+                      CSV
+                    </Button>
+                    
+                    <Button 
+                      onClick={() => handleDownloadReport('json')}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                      disabled={isLoading}
+                    >
+                      <DownloadIcon className="mr-2 h-4 w-4" />
+                      JSON
+                    </Button>
+                  </div>
+                </div>
               </div>
+              
+              {/* Статус скачивания */}
+              {downloadStatus && (
+                <div className={`mb-4 p-3 rounded-md ${downloadStatus.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {downloadStatus.message}
+                </div>
+              )}
+              
+              {/* Статус сохранения */}
+              {saveStatus && (
+                <div className={`mb-4 p-3 rounded-md ${saveStatus.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {saveStatus.message}
+                </div>
+              )}
               
               {/* Отображение результатов в табличном виде */}
               <StructuredReportTable 
@@ -479,12 +529,6 @@ export default function HomePage() {
                 }))} 
                 onSaveReport={handleSaveReport}
               />
-              
-              {saveStatus && (
-                <div className={`mt-4 p-3 rounded-md ${saveStatus.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                  {saveStatus.message}
-                </div>
-              )}
             </section>
           )}
         </TabsContent>
