@@ -76,7 +76,8 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
       return "bg-orange-500 text-white hover:bg-orange-600";
     }
     
-    return "hover:bg-gray-100 dark:hover:bg-gray-700";
+    // Изменено: заменен белый фон на затемнение при наведении
+    return "hover:bg-gray-800 dark:hover:bg-gray-900";
   };
   
   // Форматирование даты
@@ -376,108 +377,28 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                   sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
                 )}
               </TableHead>
-              <TableHead 
-                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
-                onClick={() => handleSort('timemap_count')}
-              >
-                Timemap {sortField === 'timemap_count' && (
-                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
-                )}
-              </TableHead>
-              <TableHead 
-                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
-                onClick={() => handleSort('recommended')}
-              >
-                Рекомендуемый {sortField === 'recommended' && (
-                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
-                )}
-              </TableHead>
-              <TableHead className="text-sm font-bold text-gray-900 dark:text-white border-0">SEO</TableHead>
-              <TableHead className="text-sm font-bold text-gray-900 dark:text-white border-0">Тематика</TableHead>
-              <TableHead className="text-sm font-bold text-gray-900 dark:text-white border-0">Оценка</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedData.map((item, index) => {
-              // Получаем данные из wayback_history_summary если основные поля пустые
               const waybackData = getWaybackData(item);
-              
               return (
-                <TableRow key={index} className={`${getRowStyle(item)} border-0`}>
-                  <TableCell className="font-semibold border-0">{item.domain}</TableCell>
-                  <TableCell className="border-0">{item.total_snapshots || waybackData.total_snapshots || '-'}</TableCell>
-                  <TableCell className="border-0">{formatDate(item.first_snapshot || waybackData.first_snapshot)}</TableCell>
-                  <TableCell className="border-0">{formatDate(item.last_snapshot || waybackData.last_snapshot)}</TableCell>
-                  <TableCell className="border-0">{item.years_covered || waybackData.years_covered || '-'}</TableCell>
-                  <TableCell className="border-0">
-                    {item.avg_interval_days !== undefined 
-                      ? item.avg_interval_days.toFixed(2) 
-                      : waybackData.avg_interval_days !== undefined 
-                        ? waybackData.avg_interval_days.toFixed(2) 
-                        : '-'}
-                  </TableCell>
-                  <TableCell className="border-0">{item.max_gap_days || waybackData.max_gap_days || '-'}</TableCell>
-                  <TableCell className="border-0">{item.timemap_count || waybackData.timemap_count || '-'}</TableCell>
-                  <TableCell className="border-0">
-                    {item.recommended ? (
-                      <Badge className="bg-green-500 text-white hover:bg-green-600 shadow-md">Да</Badge>
-                    ) : (
-                      <Badge className="bg-gray-200 text-gray-800 hover:bg-gray-300 shadow-md">Нет</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="border-0">
-                    {item.seo_metrics ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 shadow-md border-0">Просмотр</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-gray-800 shadow-xl border-0">
-                          <DropdownMenuItem className="flex flex-col items-start">
-                            <span className="font-medium mb-1 text-gray-900 dark:text-white">SEO метрики:</span>
-                            <pre className="text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded w-full overflow-x-auto text-gray-800 dark:text-gray-200">
-                              {JSON.stringify(item.seo_metrics, null, 2)}
-                            </pre>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : (
-                      <span className="text-gray-500 dark:text-gray-400">Нет данных</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="border-0">
-                    {item.thematic_analysis_result ? (
-                      item.thematic_analysis_result.error ? (
-                        <span className="text-red-500 text-xs">{item.thematic_analysis_result.error}</span>
-                      ) : (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 shadow-md border-0">Просмотр</Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-gray-800 shadow-xl border-0">
-                            <DropdownMenuItem className="flex flex-col items-start">
-                              <span className="font-medium mb-1 text-gray-900 dark:text-white">Тематический анализ:</span>
-                              <pre className="text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded w-full overflow-x-auto text-gray-800 dark:text-gray-200">
-                                {JSON.stringify(item.thematic_analysis_result, null, 2)}
-                              </pre>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )
-                    ) : (
-                      <span className="text-gray-500 dark:text-gray-400">Нет данных</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-gray-900 dark:text-white font-medium border-0">{item.assessment_summary || 'Ожидается'}</TableCell>
+                <TableRow 
+                  key={index} 
+                  className={`${getRowStyle(item)} transition-colors duration-200`}
+                >
+                  <TableCell className="font-medium">{item.domain}</TableCell>
+                  <TableCell>{waybackData.total_snapshots || '-'}</TableCell>
+                  <TableCell>{formatDate(waybackData.first_snapshot)}</TableCell>
+                  <TableCell>{formatDate(waybackData.last_snapshot)}</TableCell>
+                  <TableCell>{waybackData.years_covered || '-'}</TableCell>
+                  <TableCell>{waybackData.avg_interval_days ? Math.round(waybackData.avg_interval_days) : '-'}</TableCell>
+                  <TableCell>{waybackData.max_gap_days ? Math.round(waybackData.max_gap_days) : '-'}</TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
-      </div>
-      
-      {/* Информация о количестве записей */}
-      <div className="text-sm text-gray-500 dark:text-gray-400">
-        Показано {sortedData.length} из {data.length} доменов
       </div>
     </div>
   );

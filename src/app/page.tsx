@@ -3,6 +3,15 @@ import React, { useState, useEffect, FormEvent } from 'react';
 import { StructuredReportTable } from '@/components/reports/StructuredReportTable';
 import { ApiSettings } from '@/components/settings/ApiSettings';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { DownloadIcon, FileIcon } from "lucide-react";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { exportToCSV, exportToExcel, exportToJSON } from '@/utils/exportUtils';
 
 // Define types for API responses
 interface DomainInput {
@@ -327,6 +336,33 @@ export default function HomePage() {
     }
   };
 
+  // Функция для скачивания отчета в разных форматах
+  const handleDownloadReport = (format: 'csv' | 'excel' | 'json') => {
+    if (!taskReport?.results || taskReport.results.length === 0) {
+      setError('No report data available to download');
+      return;
+    }
+
+    try {
+      const filename = `domain_analysis_${taskReport.task_id}`;
+      
+      switch (format) {
+        case 'csv':
+          exportToCSV(taskReport.results, filename);
+          break;
+        case 'excel':
+          exportToExcel(taskReport.results, filename);
+          break;
+        case 'json':
+          exportToJSON(taskReport.results, filename);
+          break;
+      }
+    } catch (err: any) {
+      console.error('Error downloading report:', err);
+      setError('Failed to download report. Please try again.');
+    }
+  };
+
   return (
     <div className="space-y-8">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -396,43 +432,87 @@ export default function HomePage() {
             <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-semibold text-white">Analysis Report (Task ID: {taskReport.task_id})</h2>
-                <button
-                  onClick={handleSaveReport}
-                  disabled={isLoading}
-                  className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md shadow-sm disabled:opacity-50 transition duration-150 ease-in-out"
-                >
-                  Save Report
-                </button>
+                <div className="flex space-x-2">
+                  <Button
+                    onClick={handleSaveReport}
+                    disabled={isLoading}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    Save Report
+                  </Button>
+                  
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="flex items-center gap-2">
+                        <DownloadIcon className="h-4 w-4" />
+                        Download
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleDownloadReport('csv')}>
+                        <FileIcon className="mr-2 h-4 w-4" />
+                        <span>CSV Format</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDownloadReport('excel')}>
+                        <FileIcon className="mr-2 h-4 w-4" />
+                        <span>Excel Format</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDownloadReport('json')}>
+                        <FileIcon className="mr-2 h-4 w-4" />
+                        <span>JSON Format</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
               
               {saveStatus && (
-                <div className={`p-3 mb-4 rounded-md ${saveStatus.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                <div className={`p-3 mb-4 rounded-md ${saveStatus.type === 'success' ? 'bg-green-800 text-green-200' : 'bg-red-800 text-red-200'}`}>
                   {saveStatus.message}
                 </div>
               )}
               
-              <div className="bg-gray-700 p-4 rounded-md shadow">
-                <StructuredReportTable 
-                  data={taskReport.results.map(result => ({
-                    domain: result.domain_name,
-                    wayback_history_summary: result.wayback_history_summary,
-                    seo_metrics: result.seo_metrics,
-                    thematic_analysis_result: result.thematic_analysis_result,
-                    assessment_score: result.assessment_score,
-                    assessment_summary: result.assessment_summary
-                  }))} 
-                  onSaveReport={handleSaveReport}
-                />
+              <div className="space-y-6">
+                {taskReport.results.map((result, index) => (
+                  <div key={index} className="bg-gray-700 p-4 rounded-md shadow">
+                    <h3 className="text-xl font-semibold text-indigo-400 mb-2">{result.domain_name}</h3>
+                    
+                    <StructuredReportTable 
+                      data={result} 
+                      title="Domain Analysis" 
+                    />
+                    
+                    {result.assessment_score !== undefined && (
+                      <div className="mt-4">
+                        <h4 className="text-md font-medium text-gray-300">Оценка:</h4>
+                        <div className="text-2xl font-bold text-indigo-400 mt-1">
+                          {result.assessment_score}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {result.assessment_summary && (
+                      <div className="mt-4">
+                        <h4 className="text-md font-medium text-gray-300">Резюме оценки:</h4>
+                        <p className="text-gray-300 mt-1">{result.assessment_summary}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </section>
           )}
         </TabsContent>
         
         <TabsContent value="settings">
-          <ApiSettings 
-            initialSettings={apiSettings}
-            onSave={handleSaveApiSettings}
-          />
+          <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
+            <h2 className="text-2xl font-semibold mb-4 text-white">API Settings</h2>
+            <ApiSettings 
+              initialSettings={apiSettings}
+              onSave={handleSaveApiSettings}
+              apiAvailable={apiAvailable}
+            />
+          </section>
         </TabsContent>
       </Tabs>
     </div>
