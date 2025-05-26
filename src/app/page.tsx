@@ -4,11 +4,17 @@ import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiSettings } from '@/components/settings/ApiSettings';
 import { StructuredReportTable } from '@/components/reports/StructuredReportTable';
+import { AnalysisProgressBar } from '@/components/analysis/AnalysisProgressBar';
 
 interface Task {
   task_id: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   message?: string;
+  current_domain?: string;
+  progress?: {
+    current: number;
+    total: number;
+  };
 }
 
 interface TaskReport {
@@ -36,6 +42,7 @@ export default function Home() {
   const [taskReport, setTaskReport] = useState<TaskReport | null>(null);
   const [saveStatus, setSaveStatus] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [apiSettings, setApiSettings] = useState<ApiSettings>({});
+  const [progressValue, setProgressValue] = useState(0);
   
   // Получаем API URL из переменных окружения
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://okw04g0os0cocooowskcwg4s.alettidesign.ru/api/v1';
@@ -68,6 +75,7 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     setSaveStatus(null);
+    setProgressValue(0);
     
     try {
       // Разбиваем ввод на отдельные домены
@@ -78,7 +86,6 @@ export default function Home() {
       }
       
       // Создаем новую задачу анализа
-      // Исправлено: убрано дублирование 'analysis' в пути
       const response = await fetchWithRedirect(`${API_URL}/analysis/analyze`, {
         method: 'POST',
         headers: {
@@ -90,7 +97,21 @@ export default function Home() {
         }),
       });
       
-      setCurrentTask(response);
+      console.log('Analysis task created:', response);
+      
+      // Проверяем, что в ответе есть task_id
+      if (!response.task_id) {
+        throw new Error('Сервер не вернул идентификатор задачи');
+      }
+      
+      // Инициализируем задачу с начальными значениями прогресса
+      setCurrentTask({
+        ...response,
+        progress: {
+          current: 0,
+          total: domains.length
+        }
+      });
       
       // Начинаем опрос статуса задачи
       pollTaskStatus(response.task_id);
@@ -102,15 +123,36 @@ export default function Home() {
   };
   
   const pollTaskStatus = async (taskId: string) => {
+    if (!taskId) {
+      console.error('Invalid task ID:', taskId);
+      setError('Некорректный идентификатор задачи');
+      setIsLoading(false);
+      return;
+    }
+    
     try {
-      const response = await fetchWithRedirect(`${API_URL}/analysis/${taskId}`);
+      const response = await fetchWithRedirect(`${API_URL}/analysis/task/${taskId}`);
       
-      setCurrentTask(response);
+      // Обновляем информацию о задаче
+      setCurrentTask(prev => {
+        // Сохраняем предыдущие значения прогресса, если они есть
+        const progress = response.progress || prev?.progress || { current: 0, total: 1 };
+        
+        // Вычисляем процент выполнения для прогресс-бара
+        const progressPercent = (progress.current / progress.total) * 100;
+        setProgressValue(progressPercent);
+        
+        return {
+          ...response,
+          progress
+        };
+      });
       
       if (response.status === 'completed') {
         // Задача завершена, получаем результаты
         const reportResponse = await fetchWithRedirect(`${API_URL}/analysis/results/${taskId}`);
         setTaskReport(reportResponse);
+        setProgressValue(100); // Устанавливаем прогресс в 100%
         setIsLoading(false);
       } else if (response.status === 'failed') {
         // Задача завершилась с ошибкой
@@ -190,7 +232,7 @@ export default function Home() {
                   name="domains"
                   rows={10}
                   className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-gray-100 placeholder-gray-400"
-                  placeholder="example.com\nexpired-domain.org\nanother-one.net"
+                  placeholder="example.com&#10;expired-domain.org&#10;another-one.net"
                   value={domainsInput}
                   onChange={(e) => setDomainsInput(e.target.value)}
                   disabled={isLoading}
@@ -209,25 +251,17 @@ export default function Home() {
           {currentTask && (
             <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
               <h2 className="text-2xl font-semibold mb-4 text-white">Task Status</h2>
-              <p className="text-gray-300">Task ID: <span className="font-mono text-indigo-400">{currentTask.task_id}</span></p>
+              {/* Task ID скрыт по требованию пользователя */}
               <p className="text-gray-300">Status: <span className={`font-semibold ${currentTask.status === 'completed' ? 'text-green-400' : currentTask.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}`}>{currentTask.status}</span></p>
               {currentTask.message && <p className="text-gray-400 italic">{currentTask.message}</p>}
               {isLoading && currentTask.status !== 'completed' && currentTask.status !== 'failed' && (
                 <div className="mt-4">
-                  <div className="animate-pulse flex space-x-4">
-                    <div className="rounded-full bg-slate-700 h-10 w-10"></div>
-                    <div className="flex-1 space-y-6 py-1">
-                      <div className="h-2 bg-slate-700 rounded"></div>
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="h-2 bg-slate-700 rounded col-span-2"></div>
-                          <div className="h-2 bg-slate-700 rounded col-span-1"></div>
-                        </div>
-                        <div className="h-2 bg-slate-700 rounded"></div>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-center text-yellow-400 mt-2">{currentTask.message || "Processing... please wait."}</p>
+                  <AnalysisProgressBar 
+                    value={progressValue}
+                    currentDomain={currentTask.current_domain}
+                    progress={currentTask.progress}
+                    status={currentTask.status}
+                  />
                 </div>
               )}
             </section>
@@ -235,7 +269,7 @@ export default function Home() {
           {taskReport && taskReport.results && (
             <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-semibold text-white">Analysis Report (Task ID: {taskReport.task_id})</h2>
+                <h2 className="text-2xl font-semibold text-white">Analysis Report</h2>
                 <button
                   onClick={handleSaveReport}
                   disabled={isLoading}
