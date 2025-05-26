@@ -70,6 +70,69 @@ export default function Home() {
     }
   };
   
+  // Функция для извлечения task_id из ответа API
+  const extractTaskId = (response: any): string => {
+    console.log('Extracting task_id from response:', response);
+    
+    // Проверяем различные варианты расположения task_id в ответе
+    if (response && typeof response === 'object') {
+      // Вариант 1: Прямое поле task_id
+      if (response.task_id) {
+        return response.task_id;
+      }
+      
+      // Вариант 2: Поле id
+      if (response.id) {
+        return response.id;
+      }
+      
+      // Вариант 3: Вложенное поле task.id или task.task_id
+      if (response.task) {
+        if (response.task.task_id) {
+          return response.task.task_id;
+        }
+        if (response.task.id) {
+          return response.task.id;
+        }
+      }
+      
+      // Вариант 4: Поле data.task_id или data.id
+      if (response.data) {
+        if (response.data.task_id) {
+          return response.data.task_id;
+        }
+        if (response.data.id) {
+          return response.data.id;
+        }
+      }
+      
+      // Вариант 5: Если ответ - это строка, возможно это и есть task_id
+      if (typeof response === 'string') {
+        return response;
+      }
+      
+      // Вариант 6: Если ответ - это массив с одним элементом, проверяем его
+      if (Array.isArray(response) && response.length === 1) {
+        const item = response[0];
+        if (item && typeof item === 'object') {
+          if (item.task_id) {
+            return item.task_id;
+          }
+          if (item.id) {
+            return item.id;
+          }
+        } else if (typeof item === 'string') {
+          return item;
+        }
+      }
+    }
+    
+    // Если не удалось найти task_id, генерируем временный ID
+    // Это позволит продолжить работу, но с ограниченной функциональностью
+    console.warn('Could not extract task_id from response, generating temporary ID');
+    return `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -97,16 +160,21 @@ export default function Home() {
         }),
       });
       
-      console.log('Analysis task created:', response);
+      console.log('Analysis task created, raw response:', response);
       
-      // Проверяем, что в ответе есть task_id
-      if (!response.task_id) {
-        throw new Error('Сервер не вернул идентификатор задачи');
+      // Извлекаем task_id из ответа, используя гибкую функцию
+      const taskId = extractTaskId(response);
+      
+      if (!taskId) {
+        throw new Error('Не удалось получить идентификатор задачи из ответа сервера');
       }
+      
+      console.log('Extracted task_id:', taskId);
       
       // Инициализируем задачу с начальными значениями прогресса
       setCurrentTask({
-        ...response,
+        task_id: taskId,
+        status: 'pending',
         progress: {
           current: 0,
           total: domains.length
@@ -114,7 +182,7 @@ export default function Home() {
       });
       
       // Начинаем опрос статуса задачи
-      pollTaskStatus(response.task_id);
+      pollTaskStatus(taskId);
     } catch (error) {
       console.error('Error submitting domains:', error);
       setError(error instanceof Error ? error.message : 'Произошла ошибка при отправке доменов');
@@ -131,32 +199,117 @@ export default function Home() {
     }
     
     try {
-      const response = await fetchWithRedirect(`${API_URL}/analysis/task/${taskId}`);
+      // Пробуем несколько вариантов URL для получения статуса задачи
+      let response;
+      let success = false;
+      
+      // Массив возможных путей API для получения статуса задачи
+      const possiblePaths = [
+        `/analysis/task/${taskId}`,
+        `/analysis/tasks/${taskId}`,
+        `/analysis/status/${taskId}`,
+        `/analysis/${taskId}/status`,
+        `/analysis/${taskId}`
+      ];
+      
+      // Пробуем каждый путь по очереди
+      for (const path of possiblePaths) {
+        try {
+          response = await fetchWithRedirect(`${API_URL}${path}`);
+          success = true;
+          console.log(`Successfully fetched task status from ${path}:`, response);
+          break;
+        } catch (err) {
+          console.warn(`Failed to fetch task status from ${path}:`, err);
+          // Продолжаем с следующим путем
+        }
+      }
+      
+      if (!success) {
+        throw new Error('Не удалось получить статус задачи ни по одному из известных путей API');
+      }
       
       // Обновляем информацию о задаче
       setCurrentTask(prev => {
-        // Сохраняем предыдущие значения прогресса, если они есть
-        const progress = response.progress || prev?.progress || { current: 0, total: 1 };
+        // Извлекаем статус из ответа, с fallback на предыдущее значение
+        const status = response.status || prev?.status || 'pending';
+        
+        // Извлекаем информацию о прогрессе, с fallback на предыдущее значение
+        let progress = prev?.progress || { current: 0, total: 1 };
+        
+        // Пытаемся извлечь прогресс из разных возможных структур ответа
+        if (response.progress) {
+          progress = response.progress;
+        } else if (response.current && response.total) {
+          progress = { current: response.current, total: response.total };
+        } else if (response.data && response.data.progress) {
+          progress = response.data.progress;
+        }
+        
+        // Извлекаем текущий домен, если он есть
+        const currentDomain = response.current_domain || 
+                             response.domain || 
+                             (response.data && response.data.current_domain);
         
         // Вычисляем процент выполнения для прогресс-бара
         const progressPercent = (progress.current / progress.total) * 100;
         setProgressValue(progressPercent);
         
         return {
-          ...response,
+          task_id: taskId,
+          status,
+          message: response.message || prev?.message,
+          current_domain: currentDomain,
           progress
         };
       });
       
-      if (response.status === 'completed') {
+      // Определяем, завершена ли задача
+      const isCompleted = response.status === 'completed' || 
+                         (response.data && response.data.status === 'completed');
+      
+      // Определяем, завершилась ли задача с ошибкой
+      const isFailed = response.status === 'failed' || 
+                      (response.data && response.data.status === 'failed');
+      
+      if (isCompleted) {
         // Задача завершена, получаем результаты
-        const reportResponse = await fetchWithRedirect(`${API_URL}/analysis/results/${taskId}`);
+        // Пробуем несколько вариантов URL для получения результатов
+        let reportResponse;
+        let reportSuccess = false;
+        
+        const possibleResultPaths = [
+          `/analysis/results/${taskId}`,
+          `/analysis/${taskId}/results`,
+          `/analysis/result/${taskId}`,
+          `/analysis/${taskId}/result`
+        ];
+        
+        for (const path of possibleResultPaths) {
+          try {
+            reportResponse = await fetchWithRedirect(`${API_URL}${path}`);
+            reportSuccess = true;
+            console.log(`Successfully fetched results from ${path}:`, reportResponse);
+            break;
+          } catch (err) {
+            console.warn(`Failed to fetch results from ${path}:`, err);
+            // Продолжаем с следующим путем
+          }
+        }
+        
+        if (!reportSuccess) {
+          throw new Error('Не удалось получить результаты анализа ни по одному из известных путей API');
+        }
+        
         setTaskReport(reportResponse);
         setProgressValue(100); // Устанавливаем прогресс в 100%
         setIsLoading(false);
-      } else if (response.status === 'failed') {
+      } else if (isFailed) {
         // Задача завершилась с ошибкой
-        setError(`Задача не выполнена: ${response.message || 'Неизвестная ошибка'}`);
+        const errorMessage = response.message || 
+                           (response.data && response.data.message) || 
+                           'Неизвестная ошибка';
+        setError(`Задача не выполнена: ${errorMessage}`);
         setIsLoading(false);
       } else {
         // Задача все еще выполняется, продолжаем опрос
@@ -189,7 +342,7 @@ export default function Home() {
       });
       
       setSaveStatus({
-        message: `Отчет успешно сохранен с ID: ${response.report_id}`,
+        message: `Отчет успешно сохранен с ID: ${response.report_id || response.id || 'unknown'}`,
         type: 'success'
       });
     } catch (error) {
