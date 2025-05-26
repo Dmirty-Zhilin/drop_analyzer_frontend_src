@@ -519,33 +519,12 @@ export default function Home() {
           }
         }
         
-        // Если все еще не удалось получить результаты, создаем тестовые данные
+        // Если не удалось получить результаты, показываем ошибку вместо создания тестовых данных
         if (!reportSuccess) {
-          console.warn('Failed to fetch results, creating test data');
-          
-          // Получаем список доменов из текущей задачи
-          const domains = domainsInput.split('\n').filter(domain => domain.trim() !== '');
-          
-          // Создаем тестовые данные
-          reportResponse = {
-            task_id: taskId,
-            results: domains.map(domain => ({
-              domain_name: domain,
-              has_snapshot: true,
-              total_snapshots: 100,
-              first_snapshot: "2010-01-01",
-              last_snapshot: "2023-01-01",
-              years_covered: 13,
-              avg_interval_days: 47.5,
-              max_gap_days: 120,
-              timemap_count: 5,
-              recommended: true,
-              assessment_score: 8.5,
-              assessment_summary: `Домен ${domain} имеет хорошую историю в архиве.`
-            }))
-          };
-          
-          reportSuccess = true;
+          console.warn('Failed to fetch results, showing error message');
+          setError('Не удалось получить результаты анализа доменов. Пожалуйста, попробуйте еще раз или обратитесь к администратору.');
+          setIsLoading(false);
+          return;
         }
         
         if (reportSuccess) {
