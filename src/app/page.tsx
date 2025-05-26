@@ -78,12 +78,16 @@ export default function Home() {
       }
       
       // Создаем новую задачу анализа
-      const response = await fetchWithRedirect(`${API_URL}/analysis/tasks/`, {
+      // Исправлено: убрано дублирование 'analysis' в пути
+      const response = await fetchWithRedirect(`${API_URL}/analysis/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ domains }),
+        body: JSON.stringify({ 
+          task_name: "Domain Analysis",
+          domains: domains 
+        }),
       });
       
       setCurrentTask(response);
@@ -99,7 +103,7 @@ export default function Home() {
   
   const pollTaskStatus = async (taskId: string) => {
     try {
-      const response = await fetchWithRedirect(`${API_URL}/analysis/tasks/${taskId}`);
+      const response = await fetchWithRedirect(`${API_URL}/analysis/${taskId}`);
       
       setCurrentTask(response);
       

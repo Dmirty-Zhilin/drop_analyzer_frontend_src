@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Drop Domain Analyzer Frontend
 
-## Getting Started
+## Обзор проекта
 
-First, run the development server:
+Drop Domain Analyzer - это веб-приложение для анализа и поиска ценных дропов доменов. Фронтенд часть построена на Next.js и предоставляет интерфейс для работы с API анализа доменов.
+
+## Основные функции
+
+- Анализ доменов на основе исторических данных
+- Отображение отчетов в табличном виде
+- Экспорт отчетов в различных форматах (JSON, CSV)
+- Фильтрация и сортировка результатов анализа
+
+## Структура проекта
+
+- `src/app` - Основные страницы приложения
+- `src/components` - Компоненты React
+  - `reports` - Компоненты для работы с отчетами
+  - `ui` - UI компоненты (кнопки, таблицы и т.д.)
+- `src/lib` - Вспомогательные функции и утилиты
+
+## Работа с отчетами
+
+### Просмотр отчетов
+
+Отчеты доступны через страницу `/reports`. На этой странице отображается список всех сохраненных отчетов с возможностью перехода к детальному просмотру каждого отчета.
+
+### Детальный просмотр отчета
+
+Детальный просмотр отчета доступен по адресу `/reports/{reportId}`. На этой странице отображается:
+
+- Информация о дате создания отчета
+- Список проанализированных доменов
+- Таблица с результатами анализа
+- Кнопки для экспорта отчета в различных форматах
+
+### Форматы данных
+
+Отчеты отображаются в виде структурированных таблиц со следующими колонками:
+- Домен
+- SEO метрики
+- Тематический анализ
+- Оценка
+- Сводка
+
+## Запуск проекта
+
+### Требования
+
+- Node.js 18+
+- npm или pnpm
+
+### Установка зависимостей
+
+```bash
+npm install
+# или
+pnpm install
+```
+
+### Запуск в режиме разработки
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
+# или
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Сборка для продакшена
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+# или
+pnpm build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Переменные окружения
 
-## Learn More
+- `NEXT_PUBLIC_API_URL` - URL API бэкенда (по умолчанию: https://okw04g0os0cocooowskcwg4s.alettidesign.ru/api/v1)
 
-To learn more about Next.js, take a look at the following resources:
+## Внесенные изменения
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+В рамках доработки были внесены следующие изменения:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Улучшено отображение отчетов:
+   - Добавлено форматирование JSON данных в читабельный вид
+   - Реализовано отображение данных в виде структурированных таблиц
 
-## Deploy on Vercel
+2. Добавлены функции экспорта отчетов:
+   - Экспорт в формате JSON
+   - Экспорт в формате CSV
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3. Улучшена интеграция с меню:
+   - Страница отчетов доступна через главное меню
+   - Добавлена навигация между списком отчетов и детальным просмотром

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { StructuredReportTable } from '@/components/reports/StructuredReportTable';
+import { ReportTable } from '@/components/reports/ReportTable';
 
 interface ReportData {
   report_id: string;
@@ -10,9 +10,9 @@ interface ReportData {
   domains: string;
   results: Array<{
     domain_name: string;
-    wayback_history_summary: string;
-    seo_metrics: string;
-    thematic_analysis_result: string;
+    wayback_history_summary: string | Record<string, any>;
+    seo_metrics: string | Record<string, any>;
+    thematic_analysis_result: string | Record<string, any>;
     assessment_score: number;
     assessment_summary: string;
   }>;
@@ -71,10 +71,10 @@ export default function ReportPage() {
     }
   }, [reportId, API_URL]);
   
-  const handleExportReport = async () => {
+  const handleExportReport = async (format: string = 'json') => {
     try {
       // Запрашиваем экспорт отчета
-      const response = await fetchWithRedirect(`${API_URL}/reports/${reportId}/export`, {
+      const response = await fetchWithRedirect(`${API_URL}/analysis/export/${reportId}?format=${format}`, {
         method: 'GET',
       });
       
@@ -83,7 +83,7 @@ export default function ReportPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `report-${reportId}.json`;
+      a.download = `report-${reportId}.${format}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -144,12 +144,20 @@ export default function ReportPage() {
       <div className="bg-gray-800 p-6 rounded-lg shadow-xl">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-white">Отчет #{report.report_id}</h1>
-          <button
-            onClick={handleExportReport}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out"
-          >
-            Экспорт отчета
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleExportReport('json')}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out"
+            >
+              Экспорт JSON
+            </button>
+            <button
+              onClick={() => handleExportReport('csv')}
+              className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out"
+            >
+              Экспорт CSV
+            </button>
+          </div>
         </div>
         
         <div className="mb-6">
@@ -162,16 +170,7 @@ export default function ReportPage() {
         </div>
         
         <div className="bg-gray-700 p-4 rounded-md shadow">
-          <StructuredReportTable 
-            data={report.results.map(result => ({
-              domain: result.domain_name,
-              wayback_history_summary: result.wayback_history_summary,
-              seo_metrics: result.seo_metrics,
-              thematic_analysis_result: result.thematic_analysis_result,
-              assessment_score: result.assessment_score,
-              assessment_summary: result.assessment_summary
-            }))} 
-          />
+          <ReportTable data={report.results} />
         </div>
       </div>
     </div>
