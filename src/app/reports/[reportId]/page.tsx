@@ -3,18 +3,31 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { ReportTable } from '@/components/reports/ReportTable';
+import { StructuredReportTable } from '@/components/reports/StructuredReportTable';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface ReportData {
   report_id: string;
   created_at: string;
   domains: string;
   results: Array<{
-    domain_name: string;
+    domain_name: string; // Изменено с domain_name для соответствия с backend
     wayback_history_summary: string | Record<string, any>;
     seo_metrics: string | Record<string, any>;
     thematic_analysis_result: string | Record<string, any>;
     assessment_score: number;
     assessment_summary: string;
+    // Добавлены поля для отображения в структурированной таблице
+    has_snapshot?: boolean;
+    total_snapshots?: number;
+    first_snapshot?: string;
+    last_snapshot?: string;
+    years_covered?: number;
+    avg_interval_days?: number;
+    max_gap_days?: number;
+    timemap_count?: number;
+    recommended?: boolean;
   }>;
 }
 
@@ -25,6 +38,7 @@ export default function ReportPage() {
   const [report, setReport] = useState<ReportData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('structured');
   
   // Получаем API URL из переменных окружения
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://okw04g0os0cocooowskcwg4s.alettidesign.ru/api/v1';
@@ -145,18 +159,18 @@ export default function ReportPage() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-white">Отчет #{report.report_id}</h1>
           <div className="flex gap-2">
-            <button
+            <Button
               onClick={() => handleExportReport('json')}
               className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out"
             >
               Экспорт JSON
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handleExportReport('csv')}
               className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out"
             >
               Экспорт CSV
-            </button>
+            </Button>
           </div>
         </div>
         
@@ -169,9 +183,18 @@ export default function ReportPage() {
           </p>
         </div>
         
-        <div className="bg-gray-700 p-4 rounded-md shadow">
-          <ReportTable data={report.results} />
-        </div>
+        <Tabs defaultValue="structured" value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="structured">Структурированный вид</TabsTrigger>
+            <TabsTrigger value="simple">Простой вид</TabsTrigger>
+          </TabsList>
+          <TabsContent value="structured" className="bg-gray-700 p-4 rounded-md shadow">
+            <StructuredReportTable data={report.results} reportId={report.report_id} />
+          </TabsContent>
+          <TabsContent value="simple" className="bg-gray-700 p-4 rounded-md shadow">
+            <ReportTable data={report.results} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

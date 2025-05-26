@@ -10,11 +10,11 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, ChevronUp, Filter, CheckCircle, Clock, Calendar, RefreshCw, FileText, FileSpreadsheet, FilePdf } from "lucide-react";
+import { ChevronDown, ChevronUp, Filter, CheckCircle, Clock, Calendar, RefreshCw, FileText, FileSpreadsheet, FilePdf, Info } from "lucide-react";
 
 // Типы данных
 interface DomainAnalysisResult {
-  domain: string;
+  domain_name: string; // Изменено с domain на domain_name для соответствия с backend
   has_snapshot?: boolean;
   availability_ts?: number;
   total_snapshots?: number;
@@ -34,6 +34,14 @@ interface DomainAnalysisResult {
   thematic_analysis_result?: Record<string, any>;
   assessment_score?: number;
   assessment_summary?: string;
+  majestic_data?: {
+    domain_authority?: number;
+    page_authority?: number;
+    trust_flow?: number;
+    citation_flow?: number;
+    backlinks?: number;
+    referring_domains?: number;
+  };
 }
 
 interface StructuredReportTableProps {
@@ -43,7 +51,7 @@ interface StructuredReportTableProps {
 }
 
 export function StructuredReportTable({ data, reportId, onSaveReport }: StructuredReportTableProps) {
-  const [sortField, setSortField] = useState<string>('domain');
+  const [sortField, setSortField] = useState<string>('domain_name'); // Изменено с domain на domain_name
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [filters, setFilters] = useState({
     minSnapshots: 0,
@@ -57,7 +65,43 @@ export function StructuredReportTable({ data, reportId, onSaveReport }: Structur
   const [searchTerm, setSearchTerm] = useState('');
   const [exporting, setExporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [loadingMajesticData, setLoadingMajesticData] = useState<Record<string, boolean>>({});
   const itemsPerPage = 20;
+
+  // Получаем API URL из переменных окружения
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://okw04g0os0cocooowskcwg4s.alettidesign.ru/api/v1';
+
+  // Функция для загрузки данных Majestic
+  const fetchMajesticData = async (domain: string, index: number) => {
+    try {
+      setLoadingMajesticData(prev => ({ ...prev, [domain]: true }));
+      
+      const response = await fetch(`${API_URL}/analysis/majestic/${domain}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      // Обновляем данные в таблице
+      const newData = [...data];
+      newData[index] = {
+        ...newData[index],
+        majestic_data: result.majestic_data
+      };
+      
+      // Обновляем состояние (в реальном приложении здесь должно быть обновление через контекст или Redux)
+      // Для демонстрации просто обновляем локальное состояние
+      data[index].majestic_data = result.majestic_data;
+      
+    } catch (error) {
+      console.error('Error fetching Majestic data:', error);
+      alert(`Ошибка при загрузке данных Majestic: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setLoadingMajesticData(prev => ({ ...prev, [domain]: false }));
+    }
+  };
 
   // Мемоизированная функция сортировки
   const sortData = useMemo(() => {
@@ -87,7 +131,7 @@ export function StructuredReportTable({ data, reportId, onSaveReport }: Structur
   const filteredData = useMemo(() => {
     return data.filter(item => {
       // Поиск по домену
-      if (searchTerm && !item.domain.toLowerCase().includes(searchTerm.toLowerCase())) {
+      if (searchTerm && !item.domain_name.toLowerCase().includes(searchTerm.toLowerCase())) { // Изменено с domain на domain_name
         return false;
       }
       
@@ -321,11 +365,11 @@ export function StructuredReportTable({ data, reportId, onSaveReport }: Structur
             <TableRow>
               <TableHead 
                 className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                onClick={() => handleSort('domain')}
+                onClick={() => handleSort('domain_name')} // Изменено с domain на domain_name
               >
                 <div className="flex items-center">
                   Домен
-                  {sortField === 'domain' && (
+                  {sortField === 'domain_name' && ( // Изменено с domain на domain_name
                     sortDirection === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
                   )}
                 </div>
@@ -418,7 +462,7 @@ export function StructuredReportTable({ data, reportId, onSaveReport }: Structur
                   )}
                 </div>
               </TableHead>
-              <TableHead>SEO</TableHead>
+              <TableHead>SO</TableHead>
               <TableHead>Тематика</TableHead>
               <TableHead>Сводка</TableHead>
             </TableRow>
@@ -427,76 +471,79 @@ export function StructuredReportTable({ data, reportId, onSaveReport }: Structur
             {paginatedData.map((item, index) => {
               // Получаем данные из wayback_history_summary, если они есть
               const waybackData = item.wayback_history_summary || {};
+              const actualIndex = (currentPage - 1) * itemsPerPage + index;
               
               return (
                 <TableRow 
                   key={index}
                   className="hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors duration-150"
                 >
-                  <TableCell className="font-semibold">{item.domain}</TableCell>
-                  <TableCell>{item.total_snapshots || waybackData.total_snapshots || '-'}</TableCell>
-                  <TableCell>{formatDate(item.first_snapshot || waybackData.first_snapshot)}</TableCell>
-                  <TableCell>{formatDate(item.last_snapshot || waybackData.last_snapshot)}</TableCell>
-                  <TableCell>{item.years_covered || waybackData.years_covered || '-'}</TableCell>
+                  <TableCell className="font-semibold">{item.domain_name}</TableCell>
+                  <TableCell>{item.total_snapshots || '-'}</TableCell>
+                  <TableCell>{formatDate(item.first_snapshot)}</TableCell>
+                  <TableCell>{formatDate(item.last_snapshot)}</TableCell>
+                  <TableCell>{item.years_covered || '-'}</TableCell>
                   <TableCell>
-                    {item.avg_interval_days !== undefined 
-                      ? item.avg_interval_days.toFixed(2) 
-                      : waybackData.avg_interval_days !== undefined 
-                        ? waybackData.avg_interval_days.toFixed(2) 
-                        : '-'}
-                  </TableCell>
-                  <TableCell>{item.max_gap_days || waybackData.max_gap_days || '-'}</TableCell>
-                  <TableCell>{item.timemap_count || waybackData.timemap_count || '-'}</TableCell>
-                  <TableCell>
-                    {item.recommended ? (
-                      <Badge className="bg-green-500 text-white hover:bg-green-600 shadow-md">Да</Badge>
-                    ) : (
-                      <Badge className="bg-gray-200 text-gray-800 hover:bg-gray-300 shadow-md">Нет</Badge>
-                    )}
+                    {item.avg_interval_days !== undefined ? `${item.avg_interval_days.toFixed(1)} дн.` : '-'}
                   </TableCell>
                   <TableCell>
-                    {item.seo_metrics ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 shadow-md">Просмотр</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-gray-800 shadow-xl">
-                          <DropdownMenuItem className="flex flex-col items-start">
-                            <span className="font-medium mb-1 text-gray-900 dark:text-white">SEO метрики:</span>
-                            <pre className="text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded w-full overflow-x-auto text-gray-800 dark:text-gray-200">
-                              {JSON.stringify(item.seo_metrics, null, 2)}
-                            </pre>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : (
-                      <span className="text-gray-500 dark:text-gray-400">Нет данных</span>
+                    {item.max_gap_days !== undefined ? `${item.max_gap_days} дн.` : '-'}
+                  </TableCell>
+                  <TableCell>{item.timemap_count || '-'}</TableCell>
+                  <TableCell>
+                    {item.recommended !== undefined ? (
+                      item.recommended ? (
+                        <Badge variant="success" className="bg-green-500">Да</Badge>
+                      ) : (
+                        <Badge variant="destructive" className="bg-red-500">Нет</Badge>
+                      )
+                    ) : '-'}
+                  </TableCell>
+                  <TableCell>
+                    {/* Кнопка SO для запроса данных Majestic */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => fetchMajesticData(item.domain_name, actualIndex)}
+                      disabled={loadingMajesticData[item.domain_name]}
+                      className="flex items-center gap-1"
+                    >
+                      {loadingMajesticData[item.domain_name] ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Info className="h-4 w-4" />
+                      )}
+                      SO
+                    </Button>
+                    
+                    {/* Отображение данных Majestic, если они загружены */}
+                    {item.majestic_data && (
+                      <div className="mt-2 text-xs space-y-1">
+                        <div><strong>DA:</strong> {item.majestic_data.domain_authority}</div>
+                        <div><strong>PA:</strong> {item.majestic_data.page_authority}</div>
+                        {item.majestic_data.trust_flow && (
+                          <div><strong>TF:</strong> {item.majestic_data.trust_flow}</div>
+                        )}
+                        {item.majestic_data.citation_flow && (
+                          <div><strong>CF:</strong> {item.majestic_data.citation_flow}</div>
+                        )}
+                      </div>
                     )}
                   </TableCell>
                   <TableCell>
                     {item.thematic_analysis_result ? (
-                      item.thematic_analysis_result.error ? (
-                        <span className="text-red-500 text-xs">{item.thematic_analysis_result.error}</span>
-                      ) : (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 shadow-md">Просмотр</Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-gray-800 shadow-xl">
-                            <DropdownMenuItem className="flex flex-col items-start">
-                              <span className="font-medium mb-1 text-gray-900 dark:text-white">Тематический анализ:</span>
-                              <pre className="text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded w-full overflow-x-auto text-gray-800 dark:text-gray-200">
-                                {JSON.stringify(item.thematic_analysis_result, null, 2)}
-                              </pre>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )
-                    ) : (
-                      <span className="text-gray-500 dark:text-gray-400">Нет данных</span>
-                    )}
+                      <div className="text-xs">
+                        {typeof item.thematic_analysis_result === 'object' 
+                          ? Object.entries(item.thematic_analysis_result).map(([key, value], i) => (
+                              <div key={i}><strong>{key}:</strong> {String(value)}</div>
+                            ))
+                          : item.thematic_analysis_result}
+                      </div>
+                    ) : '-'}
                   </TableCell>
-                  <TableCell className="text-gray-900 dark:text-white font-medium">{item.assessment_summary || 'Ожидается'}</TableCell>
+                  <TableCell>
+                    {item.assessment_summary || '-'}
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -505,46 +552,51 @@ export function StructuredReportTable({ data, reportId, onSaveReport }: Structur
       </div>
       
       {/* Пагинация */}
-      {sortedData.length > itemsPerPage && (
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            Показано {paginatedData.length} из {sortedData.length} доменов
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center mt-4">
+          <div className="text-sm text-gray-500">
+            Показано {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, sortedData.length)} из {sortedData.length}
           </div>
-          <div className="flex gap-1">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setCurrentPage(1)}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
             >
-              Первая
+              Назад
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-            >
-              Предыдущая
-            </Button>
-            <span className="px-3 py-2 text-sm">
-              {currentPage} из {totalPages}
-            </span>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              // Логика для отображения страниц вокруг текущей
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+              
+              return (
+                <Button
+                  key={i}
+                  variant={currentPage === pageNum ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCurrentPage(pageNum)}
+                >
+                  {pageNum}
+                </Button>
+              );
+            })}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
             >
-              Следующая
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setCurrentPage(totalPages)}
-              disabled={currentPage === totalPages}
-            >
-              Последняя
+              Вперед
             </Button>
           </div>
         </div>

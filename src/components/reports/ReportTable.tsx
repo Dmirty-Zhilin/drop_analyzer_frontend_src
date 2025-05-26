@@ -3,12 +3,20 @@ import React from 'react';
 
 // Определение типов данных для отчета
 interface DomainAnalysisResult {
-  domain_name: string;
+  domain_name: string; // Изменено с domain_name на domain_name для соответствия с backend
   wayback_history_summary?: Record<string, any>;
   seo_metrics?: Record<string, any>;
   thematic_analysis_result?: Record<string, any>;
   assessment_score?: number;
   assessment_summary?: string;
+  majestic_data?: {
+    domain_authority?: number;
+    page_authority?: number;
+    trust_flow?: number;
+    citation_flow?: number;
+    backlinks?: number;
+    referring_domains?: number;
+  };
 }
 
 interface ReportTableProps {
