@@ -50,6 +50,7 @@ export default function Home() {
   // Функция для обработки редиректов и ошибок сети
   const fetchWithRedirect = async (url: string, options: RequestInit = {}) => {
     try {
+      console.log(`Fetching URL: ${url}`);
       // Добавляем параметр redirect: 'follow' для обработки редиректов
       const response = await fetch(url, {
         ...options,
@@ -57,12 +58,15 @@ export default function Home() {
       });
       
       if (!response.ok) {
+        console.error(`HTTP error! Status: ${response.status} for URL: ${url}`);
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      console.log(`Response data from ${url}:`, data);
+      return data;
     } catch (error) {
-      console.error('Fetch error:', error);
+      console.error(`Fetch error for ${url}:`, error);
       if (error instanceof TypeError && error.message.includes('NetworkError')) {
         throw new Error('Сетевая ошибка. Проверьте подключение к API серверу.');
       }
@@ -125,12 +129,114 @@ export default function Home() {
           return item;
         }
       }
+      
+      // Вариант 7: Поиск по всем полям первого уровня, которые могут содержать task_id
+      for (const key in response) {
+        if (
+          (key.includes('task') || key.includes('id')) && 
+          typeof response[key] === 'string' && 
+          response[key].length > 5
+        ) {
+          console.log(`Found potential task_id in field ${key}:`, response[key]);
+          return response[key];
+        }
+      }
     }
     
     // Если не удалось найти task_id, генерируем временный ID
     // Это позволит продолжить работу, но с ограниченной функциональностью
     console.warn('Could not extract task_id from response, generating temporary ID');
     return `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  };
+  
+  // Функция для извлечения результатов из ответа API
+  const extractResults = (response: any): any => {
+    console.log('Extracting results from response:', response);
+    
+    // Проверяем различные варианты расположения результатов в ответе
+    if (response && typeof response === 'object') {
+      // Вариант 1: Прямое поле results
+      if (response.results && Array.isArray(response.results)) {
+        return {
+          task_id: response.task_id || 'unknown',
+          results: response.results
+        };
+      }
+      
+      // Вариант 2: Поле data.results
+      if (response.data && response.data.results && Array.isArray(response.data.results)) {
+        return {
+          task_id: response.task_id || response.data.task_id || 'unknown',
+          results: response.data.results
+        };
+      }
+      
+      // Вариант 3: Сам ответ является массивом результатов
+      if (Array.isArray(response)) {
+        // Проверяем, что это похоже на массив результатов анализа доменов
+        if (response.length > 0 && response[0].domain_name) {
+          return {
+            task_id: 'unknown',
+            results: response
+          };
+        }
+      }
+      
+      // Вариант 4: Поле domains или domain_results
+      if (response.domains && Array.isArray(response.domains)) {
+        return {
+          task_id: response.task_id || 'unknown',
+          results: response.domains
+        };
+      }
+      
+      if (response.domain_results && Array.isArray(response.domain_results)) {
+        return {
+          task_id: response.task_id || 'unknown',
+          results: response.domain_results
+        };
+      }
+      
+      // Вариант 5: Поле data является массивом результатов
+      if (response.data && Array.isArray(response.data)) {
+        if (response.data.length > 0 && response.data[0].domain_name) {
+          return {
+            task_id: response.task_id || 'unknown',
+            results: response.data
+          };
+        }
+      }
+      
+      // Вариант 6: Результаты находятся в поле с именем, содержащим "result" или "domain"
+      for (const key in response) {
+        if (
+          (key.includes('result') || key.includes('domain')) && 
+          Array.isArray(response[key]) && 
+          response[key].length > 0
+        ) {
+          console.log(`Found potential results in field ${key}:`, response[key]);
+          return {
+            task_id: response.task_id || 'unknown',
+            results: response[key]
+          };
+        }
+      }
+      
+      // Вариант 7: Если в ответе есть только один домен
+      if (response.domain_name) {
+        return {
+          task_id: response.task_id || 'unknown',
+          results: [response]
+        };
+      }
+    }
+    
+    // Если не удалось найти результаты, возвращаем пустой массив
+    console.warn('Could not extract results from response, returning empty array');
+    return {
+      task_id: 'unknown',
+      results: []
+    };
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -209,7 +315,10 @@ export default function Home() {
         `/analysis/tasks/${taskId}`,
         `/analysis/status/${taskId}`,
         `/analysis/${taskId}/status`,
-        `/analysis/${taskId}`
+        `/analysis/${taskId}`,
+        `/tasks/${taskId}`,
+        `/task/${taskId}`,
+        `/status/${taskId}`
       ];
       
       // Пробуем каждый путь по очереди
@@ -232,7 +341,11 @@ export default function Home() {
       // Обновляем информацию о задаче
       setCurrentTask(prev => {
         // Извлекаем статус из ответа, с fallback на предыдущее значение
-        const status = response.status || prev?.status || 'pending';
+        const status = response.status || 
+                      (response.data && response.data.status) || 
+                      (response.task && response.task.status) || 
+                      prev?.status || 
+                      'pending';
         
         // Извлекаем информацию о прогрессе, с fallback на предыдущее значение
         let progress = prev?.progress || { current: 0, total: 1 };
@@ -244,12 +357,15 @@ export default function Home() {
           progress = { current: response.current, total: response.total };
         } else if (response.data && response.data.progress) {
           progress = response.data.progress;
+        } else if (response.task && response.task.progress) {
+          progress = response.task.progress;
         }
         
         // Извлекаем текущий домен, если он есть
         const currentDomain = response.current_domain || 
                              response.domain || 
-                             (response.data && response.data.current_domain);
+                             (response.data && response.data.current_domain) ||
+                             (response.task && response.task.current_domain);
         
         // Вычисляем процент выполнения для прогресс-бара
         const progressPercent = (progress.current / progress.total) * 100;
@@ -258,7 +374,10 @@ export default function Home() {
         return {
           task_id: taskId,
           status,
-          message: response.message || prev?.message,
+          message: response.message || 
+                  (response.data && response.data.message) || 
+                  (response.task && response.task.message) || 
+                  prev?.message,
           current_domain: currentDomain,
           progress
         };
@@ -266,11 +385,13 @@ export default function Home() {
       
       // Определяем, завершена ли задача
       const isCompleted = response.status === 'completed' || 
-                         (response.data && response.data.status === 'completed');
+                         (response.data && response.data.status === 'completed') ||
+                         (response.task && response.task.status === 'completed');
       
       // Определяем, завершилась ли задача с ошибкой
       const isFailed = response.status === 'failed' || 
-                      (response.data && response.data.status === 'failed');
+                      (response.data && response.data.status === 'failed') ||
+                      (response.task && response.task.status === 'failed');
       
       if (isCompleted) {
         // Задача завершена, получаем результаты
@@ -278,22 +399,58 @@ export default function Home() {
         let reportResponse;
         let reportSuccess = false;
         
+        // Расширенный список возможных путей для получения результатов
         const possibleResultPaths = [
           `/analysis/results/${taskId}`,
           `/analysis/${taskId}/results`,
           `/analysis/result/${taskId}`,
-          `/analysis/${taskId}/result`
+          `/analysis/${taskId}/result`,
+          `/results/${taskId}`,
+          `/${taskId}/results`,
+          `/result/${taskId}`,
+          `/${taskId}/result`,
+          `/analysis/tasks/${taskId}/results`,
+          `/analysis/tasks/${taskId}/result`,
+          `/analysis/task/${taskId}/results`,
+          `/analysis/task/${taskId}/result`,
+          `/tasks/${taskId}/results`,
+          `/tasks/${taskId}/result`,
+          `/task/${taskId}/results`,
+          `/task/${taskId}/result`,
+          `/analysis/${taskId}`, // Иногда статус и результаты возвращаются по одному пути
+          `/task/${taskId}`,
+          `/tasks/${taskId}`
         ];
         
+        // Пробуем каждый путь по очереди
         for (const path of possibleResultPaths) {
           try {
             reportResponse = await fetchWithRedirect(`${API_URL}${path}`);
-            reportSuccess = true;
-            console.log(`Successfully fetched results from ${path}:`, reportResponse);
-            break;
+            
+            // Проверяем, содержит ли ответ результаты
+            const extractedResults = extractResults(reportResponse);
+            if (extractedResults && extractedResults.results && extractedResults.results.length > 0) {
+              reportSuccess = true;
+              reportResponse = extractedResults;
+              console.log(`Successfully fetched results from ${path}:`, reportResponse);
+              break;
+            } else {
+              console.warn(`Response from ${path} does not contain valid results:`, reportResponse);
+            }
           } catch (err) {
             console.warn(`Failed to fetch results from ${path}:`, err);
             // Продолжаем с следующим путем
+          }
+        }
+        
+        // Если не удалось получить результаты, пробуем использовать данные из ответа статуса
+        if (!reportSuccess) {
+          console.log('Trying to extract results from status response:', response);
+          const extractedResults = extractResults(response);
+          if (extractedResults && extractedResults.results && extractedResults.results.length > 0) {
+            reportSuccess = true;
+            reportResponse = extractedResults;
+            console.log('Successfully extracted results from status response:', reportResponse);
           }
         }
         
@@ -308,6 +465,7 @@ export default function Home() {
         // Задача завершилась с ошибкой
         const errorMessage = response.message || 
                            (response.data && response.data.message) || 
+                           (response.task && response.task.message) || 
                            'Неизвестная ошибка';
         setError(`Задача не выполнена: ${errorMessage}`);
         setIsLoading(false);
@@ -329,15 +487,29 @@ export default function Home() {
     setSaveStatus(null);
     
     try {
+      // Подготавливаем данные для сохранения отчета
+      // Проверяем наличие необходимых полей в результатах
+      const results = taskReport.results.map(result => {
+        // Убеждаемся, что все необходимые поля присутствуют
+        return {
+          domain_name: result.domain_name || 'unknown',
+          wayback_history_summary: result.wayback_history_summary || '',
+          seo_metrics: result.seo_metrics || '',
+          thematic_analysis_result: result.thematic_analysis_result || '',
+          assessment_score: result.assessment_score || 0,
+          assessment_summary: result.assessment_summary || ''
+        };
+      });
+      
       const response = await fetchWithRedirect(`${API_URL}/reports/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          task_id: taskReport.task_id,
-          domains: taskReport.results.map(r => r.domain_name).join(','),
-          results: taskReport.results
+          task_id: taskReport.task_id || 'unknown',
+          domains: results.map(r => r.domain_name).join(','),
+          results: results
         }),
       });
       
@@ -441,12 +613,12 @@ export default function Home() {
               <div className="bg-gray-700 p-4 rounded-md shadow">
                 <StructuredReportTable 
                   data={taskReport.results.map(result => ({
-                    domain: result.domain_name,
-                    wayback_history_summary: result.wayback_history_summary,
-                    seo_metrics: result.seo_metrics,
-                    thematic_analysis_result: result.thematic_analysis_result,
-                    assessment_score: result.assessment_score,
-                    assessment_summary: result.assessment_summary
+                    domain: result.domain_name || 'unknown',
+                    wayback_history_summary: result.wayback_history_summary || '',
+                    seo_metrics: result.seo_metrics || '',
+                    thematic_analysis_result: result.thematic_analysis_result || '',
+                    assessment_score: result.assessment_score || 0,
+                    assessment_summary: result.assessment_summary || ''
                   }))} 
                   onSaveReport={handleSaveReport}
                 />
