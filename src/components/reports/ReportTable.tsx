@@ -1,6 +1,5 @@
 "use client";
 import React from 'react';
-
 // Определение типов данных для отчета
 interface DomainAnalysisResult {
   domain_name: string;
@@ -10,16 +9,13 @@ interface DomainAnalysisResult {
   assessment_score?: number;
   assessment_summary?: string;
 }
-
 interface ReportTableProps {
   data: DomainAnalysisResult[];
 }
-
 export function ReportTable({ data }: ReportTableProps) {
   if (!data || data.length === 0) {
     return <div className="p-4 text-center text-gray-500">Нет данных для отображения</div>;
   }
-
   return (
     <div className="overflow-x-auto rounded-md border">
       <table className="w-full text-sm">
@@ -34,7 +30,10 @@ export function ReportTable({ data }: ReportTableProps) {
         </thead>
         <tbody>
           {data.map((item, index) => (
-            <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+            <tr 
+              key={index} 
+              className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors duration-150`}
+            >
               <td className="px-4 py-3 font-medium">{item.domain_name}</td>
               <td className="px-4 py-3">
                 {item.seo_metrics ? (

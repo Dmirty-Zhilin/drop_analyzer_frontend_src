@@ -10,7 +10,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, ChevronUp, Filter, CheckCircle, Clock, Calendar, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronUp, Filter, CheckCircle, Clock, Calendar, RefreshCw, FileText, FileSpreadsheet, FilePdf } from "lucide-react";
 
 // Типы данных
 interface DomainAnalysisResult {
@@ -38,10 +38,11 @@ interface DomainAnalysisResult {
 
 interface StructuredReportTableProps {
   data: DomainAnalysisResult[];
+  reportId?: string;
   onSaveReport?: () => void;
 }
 
-export function StructuredReportTable({ data, onSaveReport }: StructuredReportTableProps) {
+export function StructuredReportTable({ data, reportId, onSaveReport }: StructuredReportTableProps) {
   const [sortField, setSortField] = useState<string>('domain');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [filters, setFilters] = useState({
@@ -50,388 +51,416 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
     maxAvgInterval: 1000,
     maxGap: 1000,
     minTimemap: 0,
-    showRecommended: false,
-    showLongLive: false
+    showRecommendedOnly: false
   });
-  
-  // Функция для определения стиля строки
-  const getRowStyle = (item: DomainAnalysisResult) => {
-    const currentYear = new Date().getFullYear();
-    const lastSnapshotYear = item.last_snapshot ? new Date(item.last_snapshot).getFullYear() : null;
-    
-    // Проверка на "long-live" домен
-    const isLongLive = 
-      (item.total_snapshots !== undefined && item.total_snapshots >= 5) && 
-      (item.years_covered !== undefined && item.years_covered >= 3) && 
-      (item.avg_interval_days !== undefined && item.avg_interval_days < 90) && 
-      (item.max_gap_days !== undefined && item.max_gap_days < 180) && 
-      (item.timemap_count !== undefined && item.timemap_count > 200);
-    
-    // Проверка на последний снимок в текущем году
-    const isCurrentYear = lastSnapshotYear === currentYear;
-    
-    if (isLongLive) {
-      return "bg-green-600 text-white hover:bg-green-700";
-    } else if (isCurrentYear) {
-      return "bg-orange-500 text-white hover:bg-orange-600";
-    }
-    
-    return "hover:bg-gray-100 dark:hover:bg-gray-700";
-  };
-  
-  // Форматирование даты
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '-';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleString();
-    } catch (e) {
-      return dateString;
-    }
-  };
-  
-  // Фильтрация данных
-  const filteredData = useMemo(() => {
-    return data.filter(item => {
-      // Базовые фильтры по числовым значениям
-      if (item.total_snapshots !== undefined && item.total_snapshots < filters.minSnapshots) return false;
-      if (item.years_covered !== undefined && item.years_covered < filters.minYears) return false;
-      if (item.avg_interval_days !== undefined && item.avg_interval_days > filters.maxAvgInterval) return false;
-      if (item.max_gap_days !== undefined && item.max_gap_days > filters.maxGap) return false;
-      if (item.timemap_count !== undefined && item.timemap_count < filters.minTimemap) return false;
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  // Мемоизированная функция сортировки
+  const sortData = useMemo(() => {
+    return (a: DomainAnalysisResult, b: DomainAnalysisResult) => {
+      let aValue = a[sortField as keyof DomainAnalysisResult];
+      let bValue = b[sortField as keyof DomainAnalysisResult];
       
-      // Фильтр по рекомендованным
-      if (filters.showRecommended && item.recommended !== true) return false;
+      // Обработка undefined значений
+      if (aValue === undefined) return sortDirection === 'asc' ? 1 : -1;
+      if (bValue === undefined) return sortDirection === 'asc' ? -1 : 1;
       
-      // Фильтр по long-live
-      if (filters.showLongLive) {
-        const isLongLive = 
-          (item.total_snapshots !== undefined && item.total_snapshots >= 5) && 
-          (item.years_covered !== undefined && item.years_covered >= 3) && 
-          (item.avg_interval_days !== undefined && item.avg_interval_days < 90) && 
-          (item.max_gap_days !== undefined && item.max_gap_days < 180) && 
-          (item.timemap_count !== undefined && item.timemap_count > 200);
-        
-        if (!isLongLive) return false;
-      }
-      
-      return true;
-    });
-  }, [data, filters]);
-  
-  // Сортировка данных
-  const sortedData = useMemo(() => {
-    return [...filteredData].sort((a, b) => {
-      const aValue = a[sortField as keyof DomainAnalysisResult];
-      const bValue = b[sortField as keyof DomainAnalysisResult];
-      
-      if (aValue === undefined && bValue === undefined) return 0;
-      if (aValue === undefined) return 1;
-      if (bValue === undefined) return -1;
-      
+      // Сравнение строк
       if (typeof aValue === 'string' && typeof bValue === 'string') {
         return sortDirection === 'asc' 
           ? aValue.localeCompare(bValue) 
           : bValue.localeCompare(aValue);
       }
       
-      // Для числовых и других типов
+      // Сравнение чисел и булевых значений
       return sortDirection === 'asc' 
-        ? (aValue < bValue ? -1 : 1)
-        : (bValue < aValue ? -1 : 1);
+        ? (aValue > bValue ? 1 : -1) 
+        : (aValue < bValue ? 1 : -1);
+    };
+  }, [sortField, sortDirection]);
+
+  // Мемоизированная функция фильтрации
+  const filteredData = useMemo(() => {
+    return data.filter(item => {
+      // Поиск по домену
+      if (searchTerm && !item.domain.toLowerCase().includes(searchTerm.toLowerCase())) {
+        return false;
+      }
+      
+      // Применение фильтров
+      if (filters.showRecommendedOnly && !item.recommended) {
+        return false;
+      }
+      
+      if (item.total_snapshots !== undefined && item.total_snapshots < filters.minSnapshots) {
+        return false;
+      }
+      
+      if (item.years_covered !== undefined && item.years_covered < filters.minYears) {
+        return false;
+      }
+      
+      if (item.avg_interval_days !== undefined && item.avg_interval_days > filters.maxAvgInterval) {
+        return false;
+      }
+      
+      if (item.max_gap_days !== undefined && item.max_gap_days > filters.maxGap) {
+        return false;
+      }
+      
+      if (item.timemap_count !== undefined && item.timemap_count < filters.minTimemap) {
+        return false;
+      }
+      
+      return true;
     });
-  }, [filteredData, sortField, sortDirection]);
-  
-  // Обработчик сортировки
+  }, [data, searchTerm, filters]);
+
+  // Мемоизированные отсортированные данные
+  const sortedData = useMemo(() => {
+    return [...filteredData].sort(sortData);
+  }, [filteredData, sortData]);
+
+  // Пагинированные данные
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return sortedData.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedData, currentPage, itemsPerPage]);
+
+  // Общее количество страниц
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+
+  // Функция для изменения сортировки
   const handleSort = (field: string) => {
-    if (sortField === field) {
+    if (field === sortField) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
       setSortDirection('asc');
     }
   };
-  
-  // Обработчик изменения фильтров
-  const handleFilterChange = (name: string, value: number | boolean) => {
-    setFilters(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-  
-  // Сброс фильтров
-  const resetFilters = () => {
-    setFilters({
-      minSnapshots: 0,
-      minYears: 0,
-      maxAvgInterval: 1000,
-      maxGap: 1000,
-      minTimemap: 0,
-      showRecommended: false,
-      showLongLive: false
-    });
-  };
-  
-  // Получение данных из wayback_history_summary
-  const getWaybackData = (item: DomainAnalysisResult) => {
-    if (!item.wayback_history_summary) return {
-      total_snapshots: 0,
-      first_snapshot: null,
-      last_snapshot: null,
-      years_covered: 0,
-      avg_interval_days: 0,
-      max_gap_days: 0,
-      timemap_count: 0
-    };
+
+  // Функция для экспорта отчета
+  const handleExport = async (format: string) => {
+    if (!reportId) return;
     
-    return {
-      total_snapshots: item.wayback_history_summary.total_snapshots || 0,
-      first_snapshot: item.wayback_history_summary.first_snapshot || null,
-      last_snapshot: item.wayback_history_summary.last_snapshot || null,
-      years_covered: item.wayback_history_summary.years_covered || 0,
-      avg_interval_days: item.wayback_history_summary.avg_interval_days || 0,
-      max_gap_days: item.wayback_history_summary.max_gap_days || 0,
-      timemap_count: item.wayback_history_summary.timemap_count || 0
-    };
+    try {
+      setExporting(true);
+      
+      // Получаем API URL из переменных окружения или используем значение по умолчанию
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://45.155.207.218:8012';
+      
+      const response = await fetch(
+        `${apiUrl}/api/v1/analysis/export/${reportId}?format=${format}`,
+        { method: 'GET' }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Ошибка экспорта: ${response.statusText}`);
+      }
+      
+      // Получаем имя файла из заголовка Content-Disposition
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const filename = contentDisposition
+        ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+        : `report-${reportId}.${format}`;
+      
+      // Создаем blob и ссылку для скачивания
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Ошибка при экспорте отчета:', error);
+      alert(`Ошибка при экспорте отчета: ${error.message}`);
+    } finally {
+      setExporting(false);
+    }
   };
-  
-  if (!data || data.length === 0) {
-    return <div className="p-4 text-center text-gray-500">Нет данных для отображения</div>;
-  }
-  
+
+  // Форматирование даты
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '-';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString();
+    } catch (e) {
+      return dateString;
+    }
+  };
+
   return (
-    <div className="space-y-4 font-rubik">
-      {/* Панель фильтров */}
-      <div className="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-lg">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white">Фильтры</h3>
+    <div className="space-y-4">
+      {/* Панель инструментов */}
+      <div className="flex flex-col sm:flex-row justify-between gap-4">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Input
+            placeholder="Поиск по домену..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-xs"
+          />
           <Button 
             variant="outline" 
-            size="sm" 
-            onClick={resetFilters} 
-            className="bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 border-0 shadow-md flex items-center gap-1"
+            onClick={() => setFilterVisible(!filterVisible)}
+            className="flex items-center gap-1"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Сбросить
+            <Filter className="h-4 w-4" />
+            Фильтры
           </Button>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Мин. снимков</label>
-            <Input 
-              type="number" 
-              value={filters.minSnapshots} 
-              onChange={(e) => handleFilterChange('minSnapshots', parseInt(e.target.value) || 0)}
-              className="shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-0 text-black dark:text-white dark:bg-gray-700 border-0"
-            />
+        {reportId && (
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => handleExport('excel')}
+              disabled={exporting}
+              className="flex items-center gap-1"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Excel
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => handleExport('csv')}
+              disabled={exporting}
+              className="flex items-center gap-1"
+            >
+              <FileText className="h-4 w-4" />
+              CSV
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => handleExport('pdf')}
+              disabled={exporting}
+              className="flex items-center gap-1"
+            >
+              <FilePdf className="h-4 w-4" />
+              PDF
+            </Button>
           </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Мин. лет</label>
-            <Input 
-              type="number" 
-              value={filters.minYears} 
-              onChange={(e) => handleFilterChange('minYears', parseInt(e.target.value) || 0)}
-              className="shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-0 text-black dark:text-white dark:bg-gray-700 border-0"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Макс. интервал (дни)</label>
-            <Input 
-              type="number" 
-              value={filters.maxAvgInterval} 
-              onChange={(e) => handleFilterChange('maxAvgInterval', parseInt(e.target.value) || 0)}
-              className="shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-0 text-black dark:text-white dark:bg-gray-700 border-0"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Макс. промежуток (дни)</label>
-            <Input 
-              type="number" 
-              value={filters.maxGap} 
-              onChange={(e) => handleFilterChange('maxGap', parseInt(e.target.value) || 0)}
-              className="shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-0 text-black dark:text-white dark:bg-gray-700 border-0"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Мин. timemap</label>
-            <Input 
-              type="number" 
-              value={filters.minTimemap} 
-              onChange={(e) => handleFilterChange('minTimemap', parseInt(e.target.value) || 0)}
-              className="shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-0 text-black dark:text-white dark:bg-gray-700 border-0"
-            />
-          </div>
-          <div className="flex items-center space-x-6 mt-8">
-            <label className="flex items-center space-x-2">
-              <input 
-                type="checkbox" 
-                checked={filters.showRecommended} 
-                onChange={(e) => handleFilterChange('showRecommended', e.target.checked)}
-                className="rounded shadow-sm w-4 h-4 text-blue-600 focus:ring-blue-500 dark:bg-gray-700 dark:border-0"
-              />
-              <span className="text-gray-700 dark:text-gray-300">Только рекомендуемые</span>
-            </label>
-            <label className="flex items-center space-x-2">
-              <input 
-                type="checkbox" 
-                checked={filters.showLongLive} 
-                onChange={(e) => handleFilterChange('showLongLive', e.target.checked)}
-                className="rounded shadow-sm w-4 h-4 text-blue-600 focus:ring-blue-500 dark:bg-gray-700 dark:border-0"
-              />
-              <span className="text-gray-700 dark:text-gray-300">Только long-live</span>
-            </label>
-          </div>
-        </div>
+        )}
       </div>
       
-      {/* Легенда */}
-      <div className="flex flex-wrap items-center gap-6 mb-2 p-4 bg-gray-800 rounded-lg shadow-lg">
-        <div className="flex items-center">
-          <div className="flex items-center justify-center w-8 h-8 bg-green-600 rounded-md shadow-lg mr-2">
-            <CheckCircle className="h-5 w-5 text-white" />
+      {/* Панель фильтров */}
+      {filterVisible && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
+          <div>
+            <label className="text-sm font-medium">Мин. снимков</label>
+            <Input
+              type="number"
+              min="0"
+              value={filters.minSnapshots}
+              onChange={(e) => setFilters({...filters, minSnapshots: parseInt(e.target.value) || 0})}
+            />
           </div>
-          <span className="text-sm font-medium text-white">Long-live домены</span>
-        </div>
-        <div className="flex items-center">
-          <div className="flex items-center justify-center w-8 h-8 bg-orange-500 rounded-md shadow-lg mr-2">
-            <Calendar className="h-5 w-5 text-white" />
+          <div>
+            <label className="text-sm font-medium">Мин. лет</label>
+            <Input
+              type="number"
+              min="0"
+              value={filters.minYears}
+              onChange={(e) => setFilters({...filters, minYears: parseInt(e.target.value) || 0})}
+            />
           </div>
-          <span className="text-sm font-medium text-white">Последний снимок в текущем году</span>
-        </div>
-      </div>
-      
-      {/* Кнопка сохранения отчета */}
-      {onSaveReport && (
-        <div className="flex justify-end mb-4">
-          <Button 
-            onClick={onSaveReport} 
-            className="bg-green-600 hover:bg-green-700 text-white shadow-lg flex items-center gap-2"
-          >
-            <CheckCircle className="h-4 w-4" />
-            Сохранить отчет
-          </Button>
+          <div>
+            <label className="text-sm font-medium">Макс. интервал (дни)</label>
+            <Input
+              type="number"
+              min="0"
+              value={filters.maxAvgInterval}
+              onChange={(e) => setFilters({...filters, maxAvgInterval: parseInt(e.target.value) || 0})}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Макс. разрыв (дни)</label>
+            <Input
+              type="number"
+              min="0"
+              value={filters.maxGap}
+              onChange={(e) => setFilters({...filters, maxGap: parseInt(e.target.value) || 0})}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Мин. карт времени</label>
+            <Input
+              type="number"
+              min="0"
+              value={filters.minTimemap}
+              onChange={(e) => setFilters({...filters, minTimemap: parseInt(e.target.value) || 0})}
+            />
+          </div>
+          <div className="flex items-end">
+            <Button 
+              variant={filters.showRecommendedOnly ? "default" : "outline"}
+              onClick={() => setFilters({...filters, showRecommendedOnly: !filters.showRecommendedOnly})}
+              className="w-full"
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Только рекомендованные
+            </Button>
+          </div>
         </div>
       )}
       
       {/* Таблица */}
-      <div className="overflow-x-auto rounded-lg shadow-xl">
-        <Table className="w-full">
-          <TableHeader className="bg-gray-100 dark:bg-gray-800">
-            <TableRow className="border-0">
+      <div className="border rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
               <TableHead 
-                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
+                className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={() => handleSort('domain')}
               >
-                Домен {sortField === 'domain' && (
-                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
-                )}
+                <div className="flex items-center">
+                  Домен
+                  {sortField === 'domain' && (
+                    sortDirection === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
+                  )}
+                </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
+                className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={() => handleSort('total_snapshots')}
               >
-                Снимки {sortField === 'total_snapshots' && (
-                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
-                )}
+                <div className="flex items-center">
+                  Всего снимков
+                  {sortField === 'total_snapshots' && (
+                    sortDirection === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
+                  )}
+                </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
+                className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={() => handleSort('first_snapshot')}
               >
-                Первый снимок {sortField === 'first_snapshot' && (
-                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
-                )}
+                <div className="flex items-center">
+                  Первый снимок
+                  {sortField === 'first_snapshot' && (
+                    sortDirection === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
+                  )}
+                </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
+                className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={() => handleSort('last_snapshot')}
               >
-                Последний снимок {sortField === 'last_snapshot' && (
-                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
-                )}
+                <div className="flex items-center">
+                  Последний снимок
+                  {sortField === 'last_snapshot' && (
+                    sortDirection === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
+                  )}
+                </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
+                className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={() => handleSort('years_covered')}
               >
-                Лет {sortField === 'years_covered' && (
-                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
-                )}
+                <div className="flex items-center">
+                  Лет охвата
+                  {sortField === 'years_covered' && (
+                    sortDirection === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
+                  )}
+                </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
+                className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={() => handleSort('avg_interval_days')}
               >
-                Ср. интервал {sortField === 'avg_interval_days' && (
-                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
-                )}
+                <div className="flex items-center">
+                  Средний интервал
+                  {sortField === 'avg_interval_days' && (
+                    sortDirection === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
+                  )}
+                </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
+                className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={() => handleSort('max_gap_days')}
               >
-                Макс. промежуток {sortField === 'max_gap_days' && (
-                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
-                )}
+                <div className="flex items-center">
+                  Макс. разрыв
+                  {sortField === 'max_gap_days' && (
+                    sortDirection === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
+                  )}
+                </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
+                className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={() => handleSort('timemap_count')}
               >
-                Timemap {sortField === 'timemap_count' && (
-                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
-                )}
+                <div className="flex items-center">
+                  Карты времени
+                  {sortField === 'timemap_count' && (
+                    sortDirection === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
+                  )}
+                </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer text-sm font-bold text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 border-0"
+                className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={() => handleSort('recommended')}
               >
-                Рекомендуемый {sortField === 'recommended' && (
-                  sortDirection === 'asc' ? <ChevronUp className="inline h-4 w-4" /> : <ChevronDown className="inline h-4 w-4" />
-                )}
+                <div className="flex items-center">
+                  Рекомендован
+                  {sortField === 'recommended' && (
+                    sortDirection === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
+                  )}
+                </div>
               </TableHead>
-              <TableHead className="text-sm font-bold text-gray-900 dark:text-white border-0">SEO</TableHead>
-              <TableHead className="text-sm font-bold text-gray-900 dark:text-white border-0">Тематика</TableHead>
-              <TableHead className="text-sm font-bold text-gray-900 dark:text-white border-0">Оценка</TableHead>
+              <TableHead>SEO</TableHead>
+              <TableHead>Тематика</TableHead>
+              <TableHead>Сводка</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedData.map((item, index) => {
-              // Получаем данные из wayback_history_summary если основные поля пустые
-              const waybackData = getWaybackData(item);
+            {paginatedData.map((item, index) => {
+              // Получаем данные из wayback_history_summary, если они есть
+              const waybackData = item.wayback_history_summary || {};
               
               return (
-                <TableRow key={index} className={`${getRowStyle(item)} border-0`}>
-                  <TableCell className="font-semibold border-0">{item.domain}</TableCell>
-                  <TableCell className="border-0">{item.total_snapshots || waybackData.total_snapshots || '-'}</TableCell>
-                  <TableCell className="border-0">{formatDate(item.first_snapshot || waybackData.first_snapshot)}</TableCell>
-                  <TableCell className="border-0">{formatDate(item.last_snapshot || waybackData.last_snapshot)}</TableCell>
-                  <TableCell className="border-0">{item.years_covered || waybackData.years_covered || '-'}</TableCell>
-                  <TableCell className="border-0">
+                <TableRow 
+                  key={index}
+                  className="hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors duration-150"
+                >
+                  <TableCell className="font-semibold">{item.domain}</TableCell>
+                  <TableCell>{item.total_snapshots || waybackData.total_snapshots || '-'}</TableCell>
+                  <TableCell>{formatDate(item.first_snapshot || waybackData.first_snapshot)}</TableCell>
+                  <TableCell>{formatDate(item.last_snapshot || waybackData.last_snapshot)}</TableCell>
+                  <TableCell>{item.years_covered || waybackData.years_covered || '-'}</TableCell>
+                  <TableCell>
                     {item.avg_interval_days !== undefined 
                       ? item.avg_interval_days.toFixed(2) 
                       : waybackData.avg_interval_days !== undefined 
                         ? waybackData.avg_interval_days.toFixed(2) 
                         : '-'}
                   </TableCell>
-                  <TableCell className="border-0">{item.max_gap_days || waybackData.max_gap_days || '-'}</TableCell>
-                  <TableCell className="border-0">{item.timemap_count || waybackData.timemap_count || '-'}</TableCell>
-                  <TableCell className="border-0">
+                  <TableCell>{item.max_gap_days || waybackData.max_gap_days || '-'}</TableCell>
+                  <TableCell>{item.timemap_count || waybackData.timemap_count || '-'}</TableCell>
+                  <TableCell>
                     {item.recommended ? (
                       <Badge className="bg-green-500 text-white hover:bg-green-600 shadow-md">Да</Badge>
                     ) : (
                       <Badge className="bg-gray-200 text-gray-800 hover:bg-gray-300 shadow-md">Нет</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="border-0">
+                  <TableCell>
                     {item.seo_metrics ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 shadow-md border-0">Просмотр</Button>
+                          <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 shadow-md">Просмотр</Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-gray-800 shadow-xl border-0">
+                        <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-gray-800 shadow-xl">
                           <DropdownMenuItem className="flex flex-col items-start">
                             <span className="font-medium mb-1 text-gray-900 dark:text-white">SEO метрики:</span>
                             <pre className="text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded w-full overflow-x-auto text-gray-800 dark:text-gray-200">
@@ -444,16 +473,16 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                       <span className="text-gray-500 dark:text-gray-400">Нет данных</span>
                     )}
                   </TableCell>
-                  <TableCell className="border-0">
+                  <TableCell>
                     {item.thematic_analysis_result ? (
                       item.thematic_analysis_result.error ? (
                         <span className="text-red-500 text-xs">{item.thematic_analysis_result.error}</span>
                       ) : (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 shadow-md border-0">Просмотр</Button>
+                            <Button variant="outline" size="sm" className="bg-white dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 shadow-md">Просмотр</Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-gray-800 shadow-xl border-0">
+                          <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-gray-800 shadow-xl">
                             <DropdownMenuItem className="flex flex-col items-start">
                               <span className="font-medium mb-1 text-gray-900 dark:text-white">Тематический анализ:</span>
                               <pre className="text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded w-full overflow-x-auto text-gray-800 dark:text-gray-200">
@@ -467,7 +496,7 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
                       <span className="text-gray-500 dark:text-gray-400">Нет данных</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-gray-900 dark:text-white font-medium border-0">{item.assessment_summary || 'Ожидается'}</TableCell>
+                  <TableCell className="text-gray-900 dark:text-white font-medium">{item.assessment_summary || 'Ожидается'}</TableCell>
                 </TableRow>
               );
             })}
@@ -475,10 +504,51 @@ export function StructuredReportTable({ data, onSaveReport }: StructuredReportTa
         </Table>
       </div>
       
-      {/* Информация о количестве записей */}
-      <div className="text-sm text-gray-500 dark:text-gray-400">
-        Показано {sortedData.length} из {data.length} доменов
-      </div>
+      {/* Пагинация */}
+      {sortedData.length > itemsPerPage && (
+        <div className="flex justify-between items-center">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Показано {paginatedData.length} из {sortedData.length} доменов
+          </div>
+          <div className="flex gap-1">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+            >
+              Первая
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              Предыдущая
+            </Button>
+            <span className="px-3 py-2 text-sm">
+              {currentPage} из {totalPages}
+            </span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Следующая
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+            >
+              Последняя
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
