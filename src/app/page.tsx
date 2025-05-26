@@ -1,343 +1,181 @@
 "use client";
-import React, { useState, useEffect, FormEvent } from 'react';
-import { StructuredReportTable } from '@/components/reports/StructuredReportTable';
-import { ApiSettings } from '@/components/settings/ApiSettings';
+
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ApiSettings } from '@/components/settings/ApiSettings';
+import { StructuredReportTable } from '@/components/reports/StructuredReportTable';
 
-// Define types for API responses
-interface DomainInput {
-  domain_name: string;
-}
-
-interface AnalysisTaskCreate {
-  domains: DomainInput[];
-}
-
-interface AnalysisTaskResponse {
+interface Task {
   task_id: string;
-  status: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
   message?: string;
-  created_at?: string;
-  updated_at?: string;
 }
 
-interface DomainAnalysisResult {
-  domain_name: string;
-  wayback_history_summary?: Record<string, any>;
-  seo_metrics?: Record<string, any>;
-  thematic_analysis_result?: Record<string, any>;
-  assessment_score?: number;
-  assessment_summary?: string;
-}
-
-interface AnalysisFullReportResponse extends AnalysisTaskResponse {
-  results?: DomainAnalysisResult[];
+interface TaskReport {
+  task_id: string;
+  results: Array<{
+    domain_name: string;
+    wayback_history_summary: string;
+    seo_metrics: string;
+    thematic_analysis_result: string;
+    assessment_score: number;
+    assessment_summary: string;
+  }>;
 }
 
 interface ApiSettings {
-  openRouterApiKey: string;
-  enableThematicAnalysis: boolean;
+  openRouterApiKey?: string;
+  enableThematicAnalysis?: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8012/api/v1';
-
-export default function HomePage() {
-  const [domainsInput, setDomainsInput] = useState<string>("");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [currentTask, setCurrentTask] = useState<AnalysisTaskResponse | null>(null);
-  const [taskReport, setTaskReport] = useState<AnalysisFullReportResponse | null>(null);
+export default function Home() {
+  const [domainsInput, setDomainsInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sseSource, setSseSource] = useState<EventSource | null>(null);
-  const [apiAvailable, setApiAvailable] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<string>("analysis");
-  const [apiSettings, setApiSettings] = useState<ApiSettings>({
-    openRouterApiKey: '',
-    enableThematicAnalysis: false
-  });
+  const [currentTask, setCurrentTask] = useState<Task | null>(null);
+  const [taskReport, setTaskReport] = useState<TaskReport | null>(null);
   const [saveStatus, setSaveStatus] = useState<{message: string, type: 'success' | 'error'} | null>(null);
-
-  // Проверка доступности API и загрузка настроек при инициализации
-  useEffect(() => {
-    const verifyApiAndLoadSettings = async () => {
-      try {
-        // Проверяем доступность API
-        const response = await fetch(`${API_BASE_URL}`, { 
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(5000)
-        });
-        
-        setApiAvailable(response.ok);
-        
-        if (response.ok) {
-          // Если API доступен, загружаем настройки
-          try {
-            const settingsResponse = await fetch(`${API_BASE_URL}/settings`);
-            if (settingsResponse.ok) {
-              const data = await settingsResponse.json();
-              setApiSettings({
-                openRouterApiKey: data.openRouterApiKey || '',
-                enableThematicAnalysis: data.enableThematicAnalysis || false
-              });
-            }
-          } catch (settingsError) {
-            console.error('Failed to load API settings:', settingsError);
-          }
-        } else {
-          setError('API сервер вернул ошибку. Пожалуйста, проверьте настройки сервера.');
-        }
-      } catch (error) {
-        console.error('API недоступен:', error);
-        setApiAvailable(false);
-        setError('API сервер недоступен. Пожалуйста, проверьте подключение к серверу.');
-      }
-    };
-    
-    verifyApiAndLoadSettings();
-  }, []);
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError(null);
-    setTaskReport(null);
-    setCurrentTask(null);
-    if (sseSource) {
-        sseSource.close();
-        setSseSource(null);
-    }
-    setIsLoading(true);
-
-    const domainNames = domainsInput.split('\n').map(d => d.trim()).filter(d => d.length > 0);
-    if (domainNames.length === 0) {
-      setError('Please enter at least one domain name.');
-      setIsLoading(false);
-      return;
-    }
-
-    const payload: AnalysisTaskCreate = {
-      domains: domainNames.map(name => ({ domain_name: name }))
-    };
-
+  const [apiSettings, setApiSettings] = useState<ApiSettings>({});
+  
+  // Получаем API URL из переменных окружения
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://okw04g0os0cocooowskcwg4s.alettidesign.ru/api/v1';
+  
+  // Функция для обработки редиректов и ошибок сети
+  const fetchWithRedirect = async (url: string, options: RequestInit = {}) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/tasks/`, {
+      // Добавляем параметр redirect: 'follow' для обработки редиректов
+      const response = await fetch(url, {
+        ...options,
+        redirect: 'follow', // Явно указываем следовать редиректам
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Fetch error:', error);
+      if (error instanceof TypeError && error.message.includes('NetworkError')) {
+        throw new Error('Сетевая ошибка. Проверьте подключение к API серверу.');
+      }
+      throw error;
+    }
+  };
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setSaveStatus(null);
+    
+    try {
+      // Разбиваем ввод на отдельные домены
+      const domains = domainsInput.split('\n').filter(domain => domain.trim() !== '');
+      
+      if (domains.length === 0) {
+        throw new Error('Пожалуйста, введите хотя бы один домен');
+      }
+      
+      // Создаем новую задачу анализа
+      const response = await fetchWithRedirect(`${API_URL}/analysis/tasks/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ domains }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-      }
-
-      const data: AnalysisTaskResponse = await response.json();
-      setCurrentTask(data); // Set initial task data, SSE will update it
-      // setIsLoading will be managed by SSE events or errors
-
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit domains for analysis.');
-      console.error(err);
-      setIsLoading(false); // Stop loading if initial task creation fails
+      
+      setCurrentTask(response);
+      
+      // Начинаем опрос статуса задачи
+      pollTaskStatus(response.task_id);
+    } catch (error) {
+      console.error('Error submitting domains:', error);
+      setError(error instanceof Error ? error.message : 'Произошла ошибка при отправке доменов');
+      setIsLoading(false);
     }
   };
-
-  const fetchTaskReport = async (taskId: string) => {
-    if (!taskId) return;
-    // setIsLoading(true); // isLoading should already be true or managed by SSE
-    try {
-      const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/report`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-      }
-      const data: AnalysisFullReportResponse = await response.json();
-      setTaskReport(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch task report.');
-    } finally {
-      setIsLoading(false); // Final loading state update
-    }
-  };
-
-  // SSE setup
-  useEffect(() => {
-    if (currentTask && currentTask.task_id && (currentTask.status === 'pending' || currentTask.status === 'processing')) {
-      // Close any existing SSE connection before opening a new one
-      if (sseSource) {
-        sseSource.close();
-      }
-
-      const source = new EventSource(`${API_BASE_URL}/tasks/${currentTask.task_id}/stream-status`);
-      setSseSource(source);
-      console.log(`SSE connection opened for task: ${currentTask.task_id}`);
-
-      source.onmessage = (event) => {
-        try {
-            const updatedTaskStatus: AnalysisTaskResponse = JSON.parse(event.data);
-            console.log("SSE message received:", updatedTaskStatus);
-            setCurrentTask(updatedTaskStatus); // Update task state with data from SSE
-
-            if (updatedTaskStatus.status === 'completed' || updatedTaskStatus.status === 'failed') {
-                // The backend now sends a custom 'complete' event for this, but onmessage can also catch it.
-                // We'll rely on the 'complete' event listener for final actions.
-            }
-        } catch (e) {
-            console.error("Failed to parse SSE message data:", event.data, e);
-            setError("Received malformed status update.");
-        }
-      };
-
-      source.addEventListener('complete', (event: MessageEvent) => {
-        console.log("SSE 'complete' event received:", event.data);
-        try {
-            const finalTaskStatus: AnalysisTaskResponse = JSON.parse(event.data);
-            setCurrentTask(finalTaskStatus);
-            if (finalTaskStatus.status === 'completed') {
-                fetchTaskReport(finalTaskStatus.task_id);
-            } else if (finalTaskStatus.status === 'failed') {
-                setError(finalTaskStatus.message || 'Task failed as per SSE completion event.');
-                setIsLoading(false);
-            }
-        } catch (e) {
-            console.error("Failed to parse SSE 'complete' event data:", event.data, e);
-            setError("Received malformed task completion data.");
-            setIsLoading(false);
-        }
-        source.close();
-        setSseSource(null);
-        console.log(`SSE connection closed for task: ${currentTask.task_id} after 'complete' event.`);
-      });
-
-      source.addEventListener('error', (event: MessageEvent) => {
-        // The 'error' event from EventSource is generic. We also listen for custom 'error' event if backend sends it.
-        // For now, assume any EventSource error means the stream has issues.
-        console.error('SSE Error Event:', event);
-        // Check if it's a custom error message from backend
-        if (event.data) {
-            try {
-                const errorData = JSON.parse(event.data);
-                if (errorData.error) {
-                    setError(`SSE Error: ${errorData.error}`);
-                }
-            } catch (e) {
-                 setError('SSE connection error. Please check task status manually or try again.');
-            }
-        } else {
-            setError('SSE connection error. Please check task status manually or try again.');
-        }
-        source.close();
-        setSseSource(null);
-        setIsLoading(false); // Stop loading on SSE error
-        console.log(`SSE connection closed for task: ${currentTask.task_id} due to error.`);
-      });
-
-      return () => {
-        if (source) {
-          source.close();
-          setSseSource(null);
-          console.log(`SSE connection closed for task: ${currentTask.task_id} on component unmount/cleanup.`);
-        }
-      };
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTask?.task_id]); // Re-run effect if task_id changes (e.g., new task submitted)
   
-  // Effect to handle initial status when currentTask is set but status is already completed/failed
-  // This might happen if the task finishes very quickly before SSE connection is established
-  useEffect(() => {
-    if (currentTask && currentTask.task_id && !sseSource) {
-        if (currentTask.status === 'completed') {
-            fetchTaskReport(currentTask.task_id);
-            setIsLoading(false);
-        } else if (currentTask.status === 'failed') {
-            setError(currentTask.message || 'Task failed.');
-            setIsLoading(false);
-        } else if (currentTask.status === 'pending' || currentTask.status === 'processing'){
-            // This will trigger the SSE connection useEffect above
-            setIsLoading(true);
-        }
+  const pollTaskStatus = async (taskId: string) => {
+    try {
+      const response = await fetchWithRedirect(`${API_URL}/analysis/tasks/${taskId}`);
+      
+      setCurrentTask(response);
+      
+      if (response.status === 'completed') {
+        // Задача завершена, получаем результаты
+        const reportResponse = await fetchWithRedirect(`${API_URL}/analysis/results/${taskId}`);
+        setTaskReport(reportResponse);
+        setIsLoading(false);
+      } else if (response.status === 'failed') {
+        // Задача завершилась с ошибкой
+        setError(`Задача не выполнена: ${response.message || 'Неизвестная ошибка'}`);
+        setIsLoading(false);
+      } else {
+        // Задача все еще выполняется, продолжаем опрос
+        setTimeout(() => pollTaskStatus(taskId), 2000);
+      }
+    } catch (error) {
+      console.error('Error polling task status:', error);
+      setError(error instanceof Error ? error.message : 'Ошибка при получении статуса задачи');
+      setIsLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTask?.status, currentTask?.task_id, sseSource]);
-
-  // Функция для сохранения отчета
+  };
+  
   const handleSaveReport = async () => {
-    if (!taskReport || !taskReport.task_id) return;
+    if (!taskReport) return;
+    
+    setIsLoading(true);
+    setSaveStatus(null);
     
     try {
-      setIsLoading(true);
-      setSaveStatus(null);
-      
-      const response = await fetch(`${API_BASE_URL}/reports/`, {
+      const response = await fetchWithRedirect(`${API_URL}/reports/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           task_id: taskReport.task_id,
-          report_name: `Report for task ${taskReport.task_id}`,
-          report_type: 'general'
+          domains: taskReport.results.map(r => r.domain_name).join(','),
+          results: taskReport.results
         }),
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to save report');
-      }
-      
-      const data = await response.json();
       setSaveStatus({
-        message: "Отчет успешно сохранен",
-        type: "success"
+        message: `Отчет успешно сохранен с ID: ${response.report_id}`,
+        type: 'success'
       });
-    } catch (err: any) {
-      console.error('Error saving report:', err);
-      setError(err.message || 'Failed to save report. Please try again.');
+    } catch (error) {
+      console.error('Error saving report:', error);
       setSaveStatus({
-        message: "Не удалось сохранить отчет. Пожалуйста, попробуйте снова.",
-        type: "error"
+        message: error instanceof Error ? error.message : 'Ошибка при сохранении отчета',
+        type: 'error'
       });
     } finally {
       setIsLoading(false);
     }
   };
   
-  // Функция для сохранения настроек API
-  const handleSaveApiSettings = async (settings: ApiSettings) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/settings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(settings),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to save API settings');
-      }
-      
-      setApiSettings(settings);
-      return Promise.resolve();
-    } catch (error) {
-      console.error('Error saving API settings:', error);
-      return Promise.reject(error);
-    }
+  const handleSaveApiSettings = async (settings: { openRouterApiKey: string; enableThematicAnalysis: boolean }) => {
+    // Здесь должна быть логика сохранения настроек API
+    // Для демонстрации просто обновляем локальное состояние
+    setApiSettings(settings);
+    return Promise.resolve();
   };
-
+  
   return (
-    <div className="space-y-8">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4">
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <Tabs defaultValue="analysis" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="analysis">Анализ доменов</TabsTrigger>
           <TabsTrigger value="settings">Настройки</TabsTrigger>
         </TabsList>
         
         <TabsContent value="analysis">
-          <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
-            <h1 className="text-3xl font-bold mb-6 text-center text-white">Analyze Drop Domains</h1>
+          <section className="bg-gray-800 p-6 rounded-lg shadow-xl mb-6">
+            <h1 className="text-3xl font-bold text-center mb-6 text-white">Analyze Drop Domains</h1>
+            
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="domains" className="block text-sm font-medium text-gray-300 mb-1">
@@ -364,7 +202,6 @@ export default function HomePage() {
             </form>
             {error && <p className="mt-4 text-red-400 text-center">Error: {error}</p>}
           </section>
-
           {currentTask && (
             <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
               <h2 className="text-2xl font-semibold mb-4 text-white">Task Status</h2>
@@ -391,7 +228,6 @@ export default function HomePage() {
               )}
             </section>
           )}
-
           {taskReport && taskReport.results && (
             <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
               <div className="flex justify-between items-center mb-4">
