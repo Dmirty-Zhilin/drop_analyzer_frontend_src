@@ -17,6 +17,15 @@ interface AnalysisTaskResponse {
   message?: string;
   created_at?: string;
   updated_at?: string;
+  progress?: ProgressInfo;
+}
+
+interface ProgressInfo {
+  total_domains: number;
+  current_domain_index: number;
+  current_domain: string;
+  status: string;
+  domains_processed: string[];
 }
 
 interface DomainAnalysisResult {
@@ -208,6 +217,14 @@ export default function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTask?.status, currentTask?.task_id, sseSource]);
 
+  // Calculate progress percentage
+  const calculateProgress = () => {
+    if (!currentTask?.progress) return 0;
+    const { current_domain_index, total_domains } = currentTask.progress;
+    if (total_domains === 0) return 0;
+    return Math.min(100, Math.round((current_domain_index / total_domains) * 100));
+  };
+
   return (
     <div className="space-y-8">
       <section className="bg-gray-800 p-6 rounded-lg shadow-xl">
@@ -245,7 +262,52 @@ export default function HomePage() {
           <p className="text-gray-300">Task ID: <span className="font-mono text-indigo-400">{currentTask.task_id}</span></p>
           <p className="text-gray-300">Status: <span className={`font-semibold ${currentTask.status === 'completed' ? 'text-green-400' : currentTask.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}`}>{currentTask.status}</span></p>
           {currentTask.message && <p className="text-gray-400 italic">{currentTask.message}</p>}
-          {isLoading && currentTask.status !== 'completed' && currentTask.status !== 'failed' && (
+          
+          {/* Progress Bar */}
+          {isLoading && currentTask.status !== 'completed' && currentTask.status !== 'failed' && currentTask.progress && (
+            <div className="mt-4">
+              <div className="w-full bg-gray-700 rounded-full h-4 mb-2">
+                <div 
+                  className="bg-indigo-600 h-4 rounded-full transition-all duration-300 ease-in-out" 
+                  style={{ width: `${calculateProgress()}%` }}
+                ></div>
+              </div>
+              
+              {/* Progress Details */}
+              <div className="flex justify-between text-sm text-gray-400 mb-4">
+                <span>Progress: {calculateProgress()}%</span>
+                <span>
+                  {currentTask.progress.current_domain_index}/{currentTask.progress.total_domains} domains
+                </span>
+              </div>
+              
+              {/* Current Domain */}
+              {currentTask.progress.current_domain && (
+                <div className="bg-gray-700 p-3 rounded-md mb-3">
+                  <p className="text-gray-300">
+                    Currently processing: <span className="font-mono text-indigo-400">{currentTask.progress.current_domain}</span>
+                  </p>
+                </div>
+              )}
+              
+              {/* Domains Processed List */}
+              {currentTask.progress.domains_processed && currentTask.progress.domains_processed.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-gray-400 mb-1">Processed domains:</p>
+                  <div className="bg-gray-700 p-2 rounded-md max-h-32 overflow-y-auto">
+                    {currentTask.progress.domains_processed.map((domain, idx) => (
+                      <div key={idx} className="text-sm text-gray-300 py-1 border-b border-gray-600 last:border-0">
+                        {idx + 1}. {domain}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Fallback loading animation when no progress data */}
+          {isLoading && currentTask.status !== 'completed' && currentTask.status !== 'failed' && !currentTask.progress && (
             <div className="mt-4">
               <div className="animate-pulse flex space-x-4">
                 <div className="rounded-full bg-slate-700 h-10 w-10"></div>
@@ -271,25 +333,67 @@ export default function HomePage() {
           <h2 className="text-2xl font-semibold mb-4 text-white">Analysis Report (Task ID: {taskReport.task_id})</h2>
           <div className="space-y-6">
             {taskReport.results.map((result, index) => (
-              <div key={index} className="bg-gray-700 p-4 rounded-md shadow">
+              <div key={index} className={`p-4 rounded-md shadow ${result.wayback_history_summary?.is_long_live ? 'bg-green-900/30 border border-green-700' : result.wayback_history_summary?.recommended ? 'bg-orange-900/30 border border-orange-700' : 'bg-gray-700'}`}>
                 <h3 className="text-xl font-semibold text-indigo-400 mb-2">{result.domain_name}</h3>
+                
+                {/* Recommendation Badges */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {result.wayback_history_summary?.recommended && (
+                    <span className="px-2 py-1 bg-orange-700/50 text-orange-200 text-xs rounded-full">
+                      Recommended
+                    </span>
+                  )}
+                  {result.wayback_history_summary?.is_long_live && (
+                    <span className="px-2 py-1 bg-green-700/50 text-green-200 text-xs rounded-full">
+                      Long-Live Domain
+                    </span>
+                  )}
+                </div>
+                
+                {/* Key Metrics Summary */}
                 {result.wayback_history_summary && (
-                  <div>
-                    <h4 className="text-md font-medium text-gray-300">Wayback History:</h4>
-                    <pre className="text-xs bg-gray-900 p-2 rounded overflow-x-auto text-gray-400">
-                      {JSON.stringify(result.wayback_history_summary, null, 2)}
-                    </pre>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+                    <div className="bg-gray-800 p-2 rounded">
+                      <p className="text-xs text-gray-400">Total Snapshots</p>
+                      <p className="text-lg font-semibold text-white">{result.wayback_history_summary.total_snapshots || 0}</p>
+                    </div>
+                    <div className="bg-gray-800 p-2 rounded">
+                      <p className="text-xs text-gray-400">Years Covered</p>
+                      <p className="text-lg font-semibold text-white">{result.wayback_history_summary.years_covered || 0}</p>
+                    </div>
+                    <div className="bg-gray-800 p-2 rounded">
+                      <p className="text-xs text-gray-400">Avg Interval (days)</p>
+                      <p className="text-lg font-semibold text-white">{result.wayback_history_summary.avg_interval_days || 0}</p>
+                    </div>
+                    <div className="bg-gray-800 p-2 rounded">
+                      <p className="text-xs text-gray-400">Max Gap (days)</p>
+                      <p className="text-lg font-semibold text-white">{result.wayback_history_summary.max_gap_days || 0}</p>
+                    </div>
                   </div>
                 )}
-                {result.thematic_analysis_result && (
-                   <div className="mt-2">
-                    <h4 className="text-md font-medium text-gray-300">Thematic Analysis:</h4>
-                     <pre className="text-xs bg-gray-900 p-2 rounded overflow-x-auto text-gray-400">
-                       {JSON.stringify(result.thematic_analysis_result, null, 2)}
-                     </pre>
-                   </div>
-                )}
-                {/* Add other metrics display here */}
+                
+                {/* Detailed Data (Collapsible) */}
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-sm text-gray-300 hover:text-white">
+                    Show detailed data
+                  </summary>
+                  {result.wayback_history_summary && (
+                    <div className="mt-2">
+                      <h4 className="text-md font-medium text-gray-300">Wayback History:</h4>
+                      <pre className="text-xs bg-gray-900 p-2 rounded overflow-x-auto text-gray-400">
+                        {JSON.stringify(result.wayback_history_summary, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  {result.thematic_analysis_result && (
+                     <div className="mt-2">
+                      <h4 className="text-md font-medium text-gray-300">Thematic Analysis:</h4>
+                       <pre className="text-xs bg-gray-900 p-2 rounded overflow-x-auto text-gray-400">
+                         {JSON.stringify(result.thematic_analysis_result, null, 2)}
+                       </pre>
+                     </div>
+                  )}
+                </details>
               </div>
             ))}
           </div>
@@ -298,4 +402,3 @@ export default function HomePage() {
     </div>
   );
 }
-
