@@ -1,6 +1,7 @@
+"use client";
+
 // Исправленный код для обработки статуса задачи и отображения прогресса
 // Этот код должен быть интегрирован в компонент страницы (page.tsx)
-
 // Функция для опроса статуса задачи с корректной обработкой прогресса
 const pollTaskStatus = async (taskId: string) => {
   try {
@@ -55,7 +56,6 @@ const pollTaskStatus = async (taskId: string) => {
     setIsLoading(false);
   }
 };
-
 // В JSX компоненте страницы:
 {isLoading && !taskReport && (
   <Box mt={6}>
