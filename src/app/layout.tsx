@@ -36,7 +36,7 @@ export default function RootLayout({
             {children}
           </main>
           <footer className="bg-gray-800 text-center text-sm py-4">
-            <p>&copy; {new Date().getFullYear()} DropDomain Analyzer. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} DropDomain Analyzer. All rights reserved. <span className="font-bold text-yellow-400">V.02</span></p>
           </footer>
         </div>
       </body>
