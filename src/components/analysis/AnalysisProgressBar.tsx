@@ -9,6 +9,8 @@ interface AnalysisProgressBarProps {
   results: any[];
 }
 
+const VERSION = 'v 0.3';
+
 const AnalysisProgressBar: React.FC<AnalysisProgressBarProps> = ({ 
   progress, 
   status, 
@@ -67,7 +69,10 @@ const AnalysisProgressBar: React.FC<AnalysisProgressBarProps> = ({
     <Box width="100%" mb={4}>
       <Flex justify="space-between" mb={2}>
         <Text>{displayStatus}</Text>
-        <Text>{displayValue}%</Text>
+        <Flex gap={2}>
+          <Text>{displayValue}%</Text>
+          <Text color="gray.500" fontSize="sm">{VERSION}</Text>
+        </Flex>
       </Flex>
       <Progress 
         value={displayValue} 
