@@ -42,7 +42,7 @@ RUN mkdir -p /app/public
 # Copy the built Next.js application from the builder stage
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.ts ./next.config.ts
+COPY --from=builder /app/next.config.js ./next.config.js
 
 # Expose port 3000 (default for Next.js)
 EXPOSE 3000
