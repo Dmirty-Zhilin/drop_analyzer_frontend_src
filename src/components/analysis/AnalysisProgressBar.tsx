@@ -3,19 +3,17 @@ import React, { useEffect, useState } from 'react';
 import { Progress, Box, Text, Flex } from '@chakra-ui/react';
 
 interface AnalysisProgressBarProps {
-  value: number;
+  progress: number;
   status: string;
-  domains: string[];
+  currentDomain?: string;
   results: any[];
-  isLoading: boolean;
 }
 
 const AnalysisProgressBar: React.FC<AnalysisProgressBarProps> = ({ 
-  value, 
+  progress, 
   status, 
-  domains = [], 
-  results = [],
-  isLoading 
+  currentDomain,
+  results = []
 }) => {
   const [displayValue, setDisplayValue] = useState(0);
   const [displayStatus, setDisplayStatus] = useState('');
@@ -31,8 +29,8 @@ const AnalysisProgressBar: React.FC<AnalysisProgressBarProps> = ({
     
     // Если задача в процессе, анимируем прогресс
     if (status === 'in_progress') {
-      // Если value = 0, показываем минимальный прогресс
-      const targetValue = value > 0 ? value : 5;
+      // Если progress = 0, показываем минимальный прогресс
+      const targetValue = progress > 0 ? progress : 5;
       
       // Плавная анимация
       const timer = setInterval(() => {
@@ -45,7 +43,9 @@ const AnalysisProgressBar: React.FC<AnalysisProgressBarProps> = ({
         });
       }, 30);
       
-      setDisplayStatus(`Анализ в процессе (${results.length}/${domains.length} доменов)`);
+      setDisplayStatus(currentDomain 
+        ? `Анализ в процессе: ${currentDomain}`
+        : 'Анализ в процессе');
       
       return () => clearInterval(timer);
     }
@@ -61,7 +61,7 @@ const AnalysisProgressBar: React.FC<AnalysisProgressBarProps> = ({
       setDisplayValue(0);
       setDisplayStatus('Неизвестный статус');
     }
-  }, [value, status, domains.length, results.length]);
+  }, [progress, status, currentDomain]);
 
   return (
     <Box width="100%" mb={4}>
@@ -73,12 +73,12 @@ const AnalysisProgressBar: React.FC<AnalysisProgressBarProps> = ({
         value={displayValue} 
         size="md" 
         colorScheme={status === 'failed' ? 'red' : 'blue'} 
-        isIndeterminate={isLoading && status !== 'completed'} 
+        isIndeterminate={status === 'in_progress' && !currentDomain} 
         borderRadius="md"
       />
       {results.length > 0 && (
         <Box mt={4}>
-          <Text fontWeight="bold">Обработанные домены ({results.length}/{domains.length}):</Text>
+          <Text fontWeight="bold">Обработанные домены ({results.length}):</Text>
           <Box maxH="200px" overflowY="auto" mt={2} p={2} borderWidth="1px" borderRadius="md">
             {results.map((result, index) => (
               <Text key={index} fontSize="sm">
