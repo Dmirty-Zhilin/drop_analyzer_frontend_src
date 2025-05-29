@@ -1,4 +1,4 @@
-// Исправленный компонент AnalysisProgressBar.tsx
+// Компонент AnalysisProgressBar.tsx
 import React, { useEffect, useState } from 'react';
 import { Progress, Box, Text, Flex } from '@chakra-ui/react';
 
