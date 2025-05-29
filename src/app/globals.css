@@ -137,3 +137,45 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
+
+/* Новые стили для улучшения интерфейса */
+
+/* Убираем бордюры и добавляем тени */
+table, th, td {
+  border: none !important;
+}
+
+.shadow-custom {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Стили для hover-эффекта с затемнением вместо белой полосы */
+tr:hover {
+  background-color: rgba(55, 65, 81, 0.7) !important; /* Затемнение вместо осветления */
+}
+
+/* Добавляем тени для карточек и кнопок */
+.card, .btn, button {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: none !important;
+}
+
+/* Улучшенные стили для кнопок */
+button:hover, .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Добавляем новые цвета для hover-эффектов */
+.bg-gray-650 {
+  background-color: rgba(55, 65, 81, 0.85);
+}
+
+.bg-gray-750 {
+  background-color: rgba(31, 41, 55, 0.95);
+}
+
+/* Улучшенные переходы для всех элементов */
+* {
+  transition: all 0.2s ease-in-out;
+}

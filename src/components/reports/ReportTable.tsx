@@ -1,5 +1,6 @@
 "use client";
-import React from 'react';
+import React, { useState } from 'react';
+import { Button } from '../ui/button';
 
 // Определение типов данных для отчета
 interface DomainAnalysisResult {
@@ -27,6 +28,45 @@ export function ReportTable({ data }: ReportTableProps) {
   if (!data || data.length === 0) {
     return <div className="p-4 text-center text-gray-500">Нет данных для отображения</div>;
   }
+
+  // Функция для экспорта отчета в CSV
+  const exportToCSV = () => {
+    // Заголовки CSV
+    const headers = [
+      'Домен',
+      'SEO метрики',
+      'Тематический анализ',
+      'Оценка',
+      'Сводка'
+    ].join(',');
+
+    // Данные CSV
+    const csvData = data.map(item => {
+      const seoMetrics = item.seo_metrics ? JSON.stringify(item.seo_metrics).replace(/,/g, ';').replace(/"/g, '""') : 'Н/Д';
+      const thematicAnalysis = item.thematic_analysis_result ? JSON.stringify(item.thematic_analysis_result).replace(/,/g, ';').replace(/"/g, '""') : 'Н/Д';
+      
+      return [
+        item.domain_name,
+        `"${seoMetrics}"`,
+        `"${thematicAnalysis}"`,
+        item.assessment_score !== undefined ? item.assessment_score : 'Н/Д',
+        `"${item.assessment_summary || 'Н/Д'}"`
+      ].join(',');
+    }).join('\n');
+
+    // Полный CSV контент
+    const csvContent = `${headers}\n${csvData}`;
+    
+    // Создание и скачивание файла
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `domain_report_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Функция для форматирования JSON в читаемый вид
   const formatJsonData = (jsonData: Record<string, any> | string) => {
@@ -58,56 +98,66 @@ export function ReportTable({ data }: ReportTableProps) {
   };
 
   return (
-    <div className="overflow-x-auto rounded-md border">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b bg-gray-700">
-            <th className="px-4 py-3 text-left font-medium text-gray-200">Домен</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-200">SEO метрики</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-200">Тематический анализ</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-200">Оценка</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-200">Сводка</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((item, index) => (
-            <tr 
-              key={index} 
-              className={`${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'} hover:bg-gray-700 transition-colors duration-150`}
-            >
-              <td className="px-4 py-3 font-medium">{item.domain_name}</td>
-              <td className="px-4 py-3">
-                {item.seo_metrics ? (
-                  <div className="max-h-40 overflow-y-auto">
-                    {formatJsonData(item.seo_metrics)}
-                  </div>
-                ) : (
-                  <span className="text-gray-400">Н/Д</span>
-                )}
-              </td>
-              <td className="px-4 py-3">
-                {item.thematic_analysis_result ? (
-                  <div className="max-h-40 overflow-y-auto">
-                    {formatJsonData(item.thematic_analysis_result)}
-                  </div>
-                ) : (
-                  <span className="text-gray-400">Н/Д</span>
-                )}
-              </td>
-              <td className="px-4 py-3">
-                {item.assessment_score !== undefined ? (
-                  <span className="font-medium">{item.assessment_score}</span>
-                ) : (
-                  <span className="text-gray-400">Н/Д</span>
-                )}
-              </td>
-              <td className="px-4 py-3">
-                {item.assessment_summary || <span className="text-gray-400">Н/Д</span>}
-              </td>
+    <div className="space-y-4">
+      <div className="flex justify-end mb-4">
+        <Button 
+          onClick={exportToCSV}
+          className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all duration-200 hover:shadow-xl"
+        >
+          Скачать отчет
+        </Button>
+      </div>
+      <div className="overflow-x-auto rounded-lg shadow-lg">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-700">
+              <th className="px-4 py-3 text-left font-medium text-gray-200">Домен</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-200">SEO метрики</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-200">Тематический анализ</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-200">Оценка</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-200">Сводка</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data.map((item, index) => (
+              <tr 
+                key={index} 
+                className={`${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'} hover:bg-gray-650 transition-colors duration-200`}
+              >
+                <td className="px-4 py-3 font-medium">{item.domain_name}</td>
+                <td className="px-4 py-3">
+                  {item.seo_metrics ? (
+                    <div className="max-h-40 overflow-y-auto">
+                      {formatJsonData(item.seo_metrics)}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">Н/Д</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {item.thematic_analysis_result ? (
+                    <div className="max-h-40 overflow-y-auto">
+                      {formatJsonData(item.thematic_analysis_result)}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">Н/Д</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {item.assessment_score !== undefined ? (
+                    <span className="font-medium">{item.assessment_score}</span>
+                  ) : (
+                    <span className="text-gray-400">Н/Д</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {item.assessment_summary || <span className="text-gray-400">Н/Д</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

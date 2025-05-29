@@ -10,7 +10,9 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, ChevronUp, Filter, CheckCircle, Clock, Calendar, RefreshCw, FileText, FileSpreadsheet, FilePdf, Info } from "lucide-react";
+import { ChevronDown, ChevronUp, Filter, CheckCircle, RefreshCw, FileText, FileSpreadsheet, Info } from "lucide-react";
+// Импортируем FilePdf напрямую, без использования barrel оптимизации
+import { FilePdf as FileDocument } from "lucide-react/dist/esm/icons";
 
 // Типы данных
 interface DomainAnalysisResult {
@@ -290,7 +292,7 @@ export function StructuredReportTable({ data, reportId, onSaveReport }: Structur
               disabled={exporting}
               className="flex items-center gap-1"
             >
-              <FilePdf className="h-4 w-4" />
+              <FileDocument className="h-4 w-4" />
               PDF
             </Button>
           </div>
@@ -442,17 +444,6 @@ export function StructuredReportTable({ data, reportId, onSaveReport }: Structur
               </TableHead>
               <TableHead 
                 className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                onClick={() => handleSort('timemap_count')}
-              >
-                <div className="flex items-center">
-                  Карты времени
-                  {sortField === 'timemap_count' && (
-                    sortDirection === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
-                  )}
-                </div>
-              </TableHead>
-              <TableHead 
-                className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={() => handleSort('recommended')}
               >
                 <div className="flex items-center">
@@ -462,138 +453,134 @@ export function StructuredReportTable({ data, reportId, onSaveReport }: Structur
                   )}
                 </div>
               </TableHead>
-              <TableHead>SO</TableHead>
-              <TableHead>Тематика</TableHead>
-              <TableHead>Сводка</TableHead>
+              <TableHead>Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedData.map((item, index) => {
-              // Получаем данные из wayback_history_summary, если они есть
-              const waybackData = item.wayback_history_summary || {};
-              const actualIndex = (currentPage - 1) * itemsPerPage + index;
-              
-              return (
-                <TableRow 
-                  key={index}
-                  className="hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors duration-150"
-                >
-                  <TableCell className="font-semibold">{item.domain_name}</TableCell>
-                  <TableCell>{item.total_snapshots || '-'}</TableCell>
-                  <TableCell>{formatDate(item.first_snapshot)}</TableCell>
-                  <TableCell>{formatDate(item.last_snapshot)}</TableCell>
-                  <TableCell>{item.years_covered || '-'}</TableCell>
-                  <TableCell>
-                    {item.avg_interval_days !== undefined ? `${item.avg_interval_days.toFixed(1)} дн.` : '-'}
-                  </TableCell>
-                  <TableCell>
-                    {item.max_gap_days !== undefined ? `${item.max_gap_days} дн.` : '-'}
-                  </TableCell>
-                  <TableCell>{item.timemap_count || '-'}</TableCell>
-                  <TableCell>
-                    {item.recommended !== undefined ? (
-                      item.recommended ? (
-                        <Badge variant="success" className="bg-green-500">Да</Badge>
-                      ) : (
-                        <Badge variant="destructive" className="bg-red-500">Нет</Badge>
-                      )
-                    ) : '-'}
-                  </TableCell>
-                  <TableCell>
-                    {/* Кнопка SO для запроса данных Majestic */}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => fetchMajesticData(item.domain_name, actualIndex)}
+            {paginatedData.map((item, index) => (
+              <TableRow key={item.domain_name} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                <TableCell className="font-medium">{item.domain_name}</TableCell>
+                <TableCell>{item.total_snapshots || '-'}</TableCell>
+                <TableCell>{formatDate(item.first_snapshot)}</TableCell>
+                <TableCell>{formatDate(item.last_snapshot)}</TableCell>
+                <TableCell>{item.years_covered?.toFixed(1) || '-'}</TableCell>
+                <TableCell>{item.avg_interval_days?.toFixed(1) || '-'}</TableCell>
+                <TableCell>{item.max_gap_days?.toFixed(1) || '-'}</TableCell>
+                <TableCell>
+                  {item.recommended ? (
+                    <Badge variant="success" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                      Да
+                    </Badge>
+                  ) : (
+                    <Badge variant="destructive" className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100">
+                      Нет
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => fetchMajesticData(item.domain_name, index)}
                       disabled={loadingMajesticData[item.domain_name]}
-                      className="flex items-center gap-1"
+                      title="Загрузить данные Majestic"
                     >
                       {loadingMajesticData[item.domain_name] ? (
                         <RefreshCw className="h-4 w-4 animate-spin" />
                       ) : (
-                        <Info className="h-4 w-4" />
+                        <RefreshCw className="h-4 w-4" />
                       )}
-                      SO
                     </Button>
-                    
-                    {/* Отображение данных Majestic, если они загружены */}
-                    {item.majestic_data && (
-                      <div className="mt-2 text-xs space-y-1">
-                        <div><strong>DA:</strong> {item.majestic_data.domain_authority}</div>
-                        <div><strong>PA:</strong> {item.majestic_data.page_authority}</div>
-                        {item.majestic_data.trust_flow && (
-                          <div><strong>TF:</strong> {item.majestic_data.trust_flow}</div>
-                        )}
-                        {item.majestic_data.citation_flow && (
-                          <div><strong>CF:</strong> {item.majestic_data.citation_flow}</div>
-                        )}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {item.thematic_analysis_result ? (
-                      <div className="text-xs">
-                        {typeof item.thematic_analysis_result === 'object' 
-                          ? Object.entries(item.thematic_analysis_result).map(([key, value], i) => (
-                              <div key={i}><strong>{key}:</strong> {String(value)}</div>
-                            ))
-                          : item.thematic_analysis_result}
-                      </div>
-                    ) : '-'}
-                  </TableCell>
-                  <TableCell>
-                    {item.assessment_summary || '-'}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <Info className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <a 
+                            href={`https://web.archive.org/web/*/${item.domain_name}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center"
+                          >
+                            Открыть в Wayback Machine
+                          </a>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <a 
+                            href={`https://${item.domain_name}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center"
+                          >
+                            Открыть сайт
+                          </a>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </div>
       
       {/* Пагинация */}
       {totalPages > 1 && (
-        <div className="flex justify-between items-center mt-4">
+        <div className="flex justify-between items-center">
           <div className="text-sm text-gray-500">
-            Показано {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, sortedData.length)} из {sortedData.length}
+            Показано {paginatedData.length} из {sortedData.length} доменов
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+          <div className="flex space-x-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
             >
               Назад
             </Button>
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              // Логика для отображения страниц вокруг текущей
-              let pageNum;
-              if (totalPages <= 5) {
-                pageNum = i + 1;
-              } else if (currentPage <= 3) {
-                pageNum = i + 1;
-              } else if (currentPage >= totalPages - 2) {
-                pageNum = totalPages - 4 + i;
-              } else {
-                pageNum = currentPage - 2 + i;
-              }
+            <div className="flex items-center space-x-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = currentPage <= 3 
+                  ? i + 1 
+                  : currentPage >= totalPages - 2 
+                    ? totalPages - 4 + i 
+                    : currentPage - 2 + i;
+                
+                if (pageNum <= 0 || pageNum > totalPages) return null;
+                
+                return (
+                  <Button 
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
               
-              return (
-                <Button
-                  key={i}
-                  variant={currentPage === pageNum ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCurrentPage(pageNum)}
-                >
-                  {pageNum}
-                </Button>
-              );
-            })}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              {totalPages > 5 && currentPage < totalPages - 2 && (
+                <>
+                  <span>...</span>
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                  >
+                    {totalPages}
+                  </Button>
+                </>
+              )}
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages}
             >
               Вперед
@@ -601,6 +588,9 @@ export function StructuredReportTable({ data, reportId, onSaveReport }: Structur
           </div>
         </div>
       )}
+      
+      {/* Majestic Data Modal */}
+      {/* Здесь можно добавить модальное окно для отображения данных Majestic */}
     </div>
   );
 }
